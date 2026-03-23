@@ -17,16 +17,17 @@ const ManualQrModal = ({ isOpen, onClose }) => {
         alert("Please fill in required fields.");
         return;
     }
-    const newQr = {
-      upiId: formData.upiId,
-      payee: formData.payeeName,
-      label: formData.label || 'Manual QR',
-      mid: formData.mid || 'N/A',
-      merchantName: 'Unassigned',
-      status: 'Active',
-      type: 'Single'
-    };
-    addQrCode(newQr);
+    
+    const fd = new FormData();
+    fd.append('upiId', formData.upiId);
+    fd.append('label', formData.label || 'Manual QR');
+    fd.append('mid', formData.mid || 'N/A');
+    fd.append('merchantName', 'Unassigned');
+    fd.append('status', 'Active');
+    fd.append('type', 'Single');
+    // Note: No qrImage appended for manual creation
+
+    addQrCode(fd);
     onClose();
   };
 

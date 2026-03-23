@@ -1,68 +1,106 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
+const API_BASE = 'http://localhost:4001/api';
+
+// Synchronous intercept to prevent React Router redirect race condition!
+if (typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    if (tokenFromUrl) {
+        sessionStorage.setItem('authToken', tokenFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check for stored session on load
-        const storedUser = localStorage.getItem('authUser');
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch (e) {
-                console.error("Failed to parse stored user", e);
-                localStorage.removeItem('authUser');
+        const checkAuth = async () => {
+
+            const token = sessionStorage.getItem('authToken');
+            if (!token) {
+                setLoading(false);
+                return;
             }
-        }
-        setLoading(false);
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setUser({
+                        id: data.userId,
+                        email: data.email,
+                        role: data.role,
+                        name: data.profile?.fullName,
+                        partnerId: data.profile?.id?.slice(0, 8) // Fallback MID
+                    });
+                } else {
+                    sessionStorage.removeItem('authToken');
+                    setUser(null);
+                }
+            } catch (err) {
+                console.error("Auth check failed", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        checkAuth();
     }, []);
 
-    const login = (email, password) => {
-        // Simulation of database validation
-        // In reality, this would be an API call
+    const login = async (email, password) => {
         if (!email || !password) return { success: false, message: 'Please enter both email and password.' };
 
-        // Hardcoded testing credentials
-        if (email === 'admin@telering.com' && password === 'admin123') {
-            const adminUser = { id: 'a1', role: 'admin', name: 'Abhipay Admin', email };
-            setUser(adminUser);
-            localStorage.setItem('authUser', JSON.stringify(adminUser));
-            return { success: true, role: 'admin' };
-        } else if (email === 'merchant@telering.com' && password === 'merchant123') {
-            const merchantUser = { id: 'm1', role: 'merchant', name: 'Kirti Jha', email, partnerId: '#9988222' };
-            setUser(merchantUser);
-            localStorage.setItem('authUser', JSON.stringify(merchantUser));
-            return { success: true, role: 'merchant' };
-        }
+        try {
+            const res = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
 
-        return { success: false, message: 'Invalid credentials. Please try again.' };
+            const data = await res.json();
+            if (res.ok) {
+                sessionStorage.setItem('authToken', data.token);
+                setUser(data.user);
+                return { success: true, role: data.user.role };
+            } else {
+                return { success: false, message: data.error || 'Login failed' };
+            }
+        } catch (err) {
+            return { success: false, message: 'Server error. Please try again.' };
+        }
     };
 
-    const loginAsMerchant = (merchant) => {
-        // Direct jump from Admin to Merchant
-        const merchantUser = { 
-            id: merchant.id, 
-            role: 'merchant', 
-            name: merchant.name, 
-            email: merchant.email, 
-            partnerId: merchant.mid || 'N/A' 
-        };
-        setUser(merchantUser);
-        localStorage.setItem('authUser', JSON.stringify(merchantUser));
-        return { success: true };
+    const getImpersonateToken = async (merchantId) => {
+        try {
+            const token = sessionStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE}/auth/login-as/${merchantId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                return { success: true, token: data.token };
+            } else {
+                return { success: false, message: data.error };
+            }
+        } catch (err) {
+            return { success: false, message: 'Server error' };
+        }
     };
 
     const logout = () => {
         setUser(null);
-        localStorage.removeItem('authUser');
+        sessionStorage.removeItem('authToken');
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, loginAsMerchant, logout, isAuthenticated: !!user, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, getImpersonateToken, isAuthenticated: !!user, loading }}>
             {children}
         </AuthContext.Provider>
     );

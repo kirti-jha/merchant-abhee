@@ -1,138 +1,472 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AppContext = createContext();
-
-const initialMockData = {
-    wallet: {
-        balance: 245000,
-        currency: 'INR',
-        lastUpdated: new Date().toISOString()
-    },
-    transactions: [
-        { id: 'tx-001', date: new Date(Date.now() - 3600000).toISOString(), description: 'Fund Transfer to Merchant A', amount: -5000, status: 'Completed', type: 'debit' },
-        { id: 'tx-002', date: new Date(Date.now() - 86400000).toISOString(), description: 'Wallet Top Up', amount: 50000, status: 'Completed', type: 'credit' },
-        { id: 'tx-003', date: new Date(Date.now() - 172800000).toISOString(), description: 'Settlement from QR', amount: 12500, status: 'Completed', type: 'credit' },
-        { id: 'tx-004', date: new Date(Date.now() - 259200000).toISOString(), description: 'Fund Transfer to Bank', amount: -10000, status: 'Pending', type: 'debit' }
-    ],
-    merchants: [
-        { id: 'm-001', mid: 'MID-8822001', name: 'FreshMart Groceries', email: 'contact@freshmart.com', status: 'Active', joined: '2025-10-12', totalVolume: 45000 },
-        { id: 'm-002', mid: 'MID-8822002', name: 'TechHaven Electronics', email: 'sales@techhaven.com', status: 'Active', joined: '2025-11-05', totalVolume: 125000 },
-        { id: 'm-003', mid: 'MID-8822003', name: 'Coffee House Co.', email: 'hello@coffeehouse.com', status: 'Inactive', joined: '2026-01-20', totalVolume: 8500 }
-    ],
-    qrCodes: [
-        { id: 'qr-001', label: 'Main Counter', status: 'Active', mid: 'MID-8822001', merchantName: 'FreshMart Groceries', type: 'Single', upiId: 'freshmart@ybl' },
-        { id: 'qr-002', label: 'Drive Thru', status: 'Active', mid: 'MID-8822003', merchantName: 'Coffee House Co.', type: 'Single', upiId: 'coffeehouse@ybl' },
-        { id: 'qr-003', label: 'Unassigned Display', status: 'Inactive', mid: 'Unassigned', merchantName: 'Unassigned', type: 'Bulk', upiId: 'Pending' }
-    ]
-};
+const API_BASE = 'http://localhost:4001/api';
 
 export const AppProvider = ({ children }) => {
-    const [appState, setAppState] = useState(() => {
-        const storedState = localStorage.getItem('teleringAppState');
-        return storedState ? JSON.parse(storedState) : initialMockData;
-    });
+    const [wallet, setWallet] = useState({ balance: 0, eWalletBalance: 0 });
+    const [merchants, setMerchants] = useState([]);
+    const [qrCodes, setQrCodes] = useState([]);
+    const [bankAccounts, setBankAccounts] = useState([]);
+    const [settlements, setSettlements] = useState([]); // For Admin Payouts
+    const [fundRequests, setFundRequests] = useState([]); // For Admin Add Money
+    const [transactions, setTransactions] = useState([]); // Service Transactions
+    const [walletHistory, setWalletHistory] = useState([]); // Wallet Movement History
+    const [loading, setLoading] = useState(true);
 
-    const [theme, setTheme] = useState(() => {
-        return localStorage.getItem('teleringTheme') || 'dark';
-    });
+    const getHeaders = useCallback(() => {
+        const token = sessionStorage.getItem('authToken');
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        };
+    }, []);
 
-    useEffect(() => {
-        localStorage.setItem('teleringAppState', JSON.stringify(appState));
-    }, [appState]);
+    const fetchData = useCallback(async () => {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) return;
 
-    useEffect(() => {
-        localStorage.setItem('teleringTheme', theme);
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark-theme');
-        } else {
-            document.documentElement.classList.remove('dark-theme');
+        try {
+            const [walletRes, merchantsRes, qrRes, txnsRes] = await Promise.all([
+                fetch(`${API_BASE}/wallet`, { headers: getHeaders() }),
+                fetch(`${API_BASE}/users`, { headers: getHeaders() }),
+                fetch(`${API_BASE}/qrcodes`, { headers: getHeaders() }),
+                fetch(`${API_BASE}/transactions`, { headers: getHeaders() }),
+                fetch(`${API_BASE}/wallet/transactions`, { headers: getHeaders() })
+            ]);
+
+            if (walletRes.ok) {
+                const data = await walletRes.json();
+                setWallet(data || { balance: 0, eWalletBalance: 0 });
+            }
+            if (merchantsRes.ok) {
+                const data = await merchantsRes.json();
+                if (Array.isArray(data)) setMerchants(data);
+            }
+            if (qrRes.ok) {
+                const data = await qrRes.json();
+                if (Array.isArray(data)) setQrCodes(data);
+            }
+            if (txnsRes.ok) {
+                const data = await txnsRes.json();
+                if (Array.isArray(data)) setTransactions(data);
+            }
+            // wallet history is the 5th element in Promise.all now
+            const historyRes = await Promise.allSettled([
+                fetch(`${API_BASE}/wallet/transactions`, { headers: getHeaders() })
+            ]);
+            if (historyRes[0].status === 'fulfilled' && historyRes[0].value.ok) {
+                const data = await historyRes[0].value.json();
+                if (Array.isArray(data)) setWalletHistory(data);
+            }
+
+            // Fetch Bank Accounts for Merchant
+            const bankRes = await fetch(`${API_BASE}/bank-accounts`, { headers: getHeaders() });
+            if (bankRes.ok) {
+                const data = await bankRes.json();
+                setBankAccounts(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch data", err);
+        } finally {
+            setLoading(false);
         }
-    }, [theme]);
+    }, [getHeaders]);
 
-    const toggleTheme = () => {
-        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    const addFunds = async (amount) => {
+        try {
+            const res = await fetch(`${API_BASE}/wallet/pg-add`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ amount })
+            });
+            if (res.ok) await fetchData();
+        } catch (err) {
+            console.error("Add funds failed", err);
+        }
     };
 
-    // Wallet Actions
-    const addFunds = (amount) => {
-        const newTransaction = {
-            id: `tx-${Date.now()}`,
-            date: new Date().toISOString(),
-            description: 'Manual Wallet Top Up',
-            amount: parseFloat(amount),
-            status: 'Completed',
-            type: 'credit'
-        };
-        setAppState(prev => ({
-            ...prev,
-            wallet: { ...prev.wallet, balance: prev.wallet.balance + parseFloat(amount) },
-            transactions: [newTransaction, ...prev.transactions]
-        }));
+    const requestFunds = async (amount, reason) => {
+        try {
+            const res = await fetch(`${API_BASE}/fund-requests`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ 
+                    amount: Number(amount), 
+                    remarks: reason || "Manual fund request from wallet" 
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            } else {
+                return { success: false, error: data.error };
+            }
+        } catch (err) {
+            console.error("Fund request failed", err);
+            return { success: false, error: "Server error" };
+        }
     };
 
-    const requestFunds = (amount, reason) => {
-         const newTransaction = {
-            id: `tx-${Date.now()}`,
-            date: new Date().toISOString(),
-            description: `Fund Request: ${reason}`,
-            amount: parseFloat(amount),
-            status: 'Pending',
-            type: 'credit'
-        };
-        setAppState(prev => ({
-            ...prev,
-            transactions: [newTransaction, ...prev.transactions]
-        }));
+    const fetchFundRequests = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/fund-requests`, {
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setFundRequests(data);
+                return data;
+            }
+        } catch (err) {
+            console.error("Fetch fund requests failed", err);
+        }
     };
 
-    // Merchant Actions
-    const addMerchant = (merchant) => {
-        setAppState(prev => ({
-            ...prev,
-            merchants: [{...merchant, id: `m-${Date.now()}`, joined: new Date().toISOString().split('T')[0], totalVolume: 0}, ...prev.merchants]
-        }));
+    const approveFundRequest = async (id) => {
+        try {
+            const res = await fetch(`${API_BASE}/fund-requests/${id}/approve`, {
+                method: 'PATCH',
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                await fetchFundRequests();
+                await fetchData();
+                return { success: true };
+            }
+        } catch (err) {
+            return { success: false };
+        }
     };
 
-    const updateMerchantStatus = (id, newStatus) => {
-        setAppState(prev => ({
-            ...prev,
-            merchants: prev.merchants.map(m => m.id === id ? { ...m, status: newStatus } : m)
-        }));
+    const rejectFundRequest = async (id, reason) => {
+        try {
+            const res = await fetch(`${API_BASE}/fund-requests/${id}/reject`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify({ reason })
+            });
+            if (res.ok) {
+                await fetchFundRequests();
+                return { success: true };
+            }
+        } catch (err) {
+            return { success: false };
+        }
     };
 
-    const deleteMerchant = (id) => {
-        setAppState(prev => ({
-            ...prev,
-            merchants: prev.merchants.filter(m => m.id !== id)
-        }));
+    const addMerchant = async (merchant) => {
+        try {
+            const res = await fetch(`${API_BASE}/users`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    email: merchant.email,
+                    password: 'Password123!', // Default password
+                    full_name: merchant.name,
+                    role: 'retailer',
+                    business_name: merchant.name,
+                    phone: '0000000000'
+                })
+            });
+            if (res.ok) await fetchData();
+        } catch (err) {
+            console.error("Add merchant failed", err);
+        }
     };
 
-    // QR Code Actions
-    const addQrCode = (qrData) => {
-        setAppState(prev => ({
-            ...prev,
-            qrCodes: [{ ...qrData, id: `qr-${Date.now()}` }, ...prev.qrCodes]
-        }));
+    const updateMerchantStatus = async (id, status) => {
+        try {
+            const res = await fetch(`${API_BASE}/users/${id}/status`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify({ status })
+            });
+            if (res.ok) await fetchData();
+        } catch (err) {
+            console.error("Update merchant status failed", err);
+        }
     };
-    
-    // Generic
-    const resetData = () => {
-        setAppState(initialMockData);
-        localStorage.setItem('teleringAppState', JSON.stringify(initialMockData));
-    }
+
+    const deleteMerchant = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this merchant?")) return;
+        try {
+            const res = await fetch(`${API_BASE}/users/${id}`, {
+                method: 'DELETE',
+                headers: getHeaders()
+            });
+            if (res.ok) await fetchData();
+        } catch (err) {
+            console.error("Delete merchant failed", err);
+        }
+    };
+
+    // --- Bank Account Management ---
+    const addBankAccount = async (bankData) => {
+        try {
+            const res = await fetch(`${API_BASE}/bank-accounts`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(bankData)
+            });
+            if (res.ok) {
+                await fetchData();
+                return { success: true };
+            }
+            return { success: false };
+        } catch (err) {
+            return { success: false };
+        }
+    };
+
+    const deleteBankAccount = async (id) => {
+        try {
+            const res = await fetch(`${API_BASE}/bank-accounts/${id}`, {
+                method: 'DELETE',
+                headers: getHeaders()
+            });
+            if (res.ok) await fetchData();
+        } catch (err) {
+            console.error("Delete bank account failed", err);
+        }
+    };
+
+    // --- Settlement Management ---
+    const requestSettlement = async (amount, bankAccountId) => {
+        try {
+            const res = await fetch(`${API_BASE}/wallet/payout`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ amount, bankAccountId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            } else {
+                return { success: false, error: data.error };
+            }
+        } catch (err) {
+            return { success: false, error: "Network error" };
+        }
+    };
+
+    const fetchSettlements = async (status = '') => {
+        try {
+            const res = await fetch(`${API_BASE}/wallet/settlements${status ? `?status=${status}` : ''}`, {
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSettlements(data);
+                return data;
+            }
+        } catch (err) {
+            console.error("Fetch settlements failed", err);
+        }
+    };
+
+    const approveSettlement = async (id) => {
+        try {
+            const res = await fetch(`${API_BASE}/wallet/settlements/${id}/approve`, {
+                method: 'POST',
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                await fetchSettlements('pending');
+                return { success: true };
+            }
+        } catch (err) {
+            return { success: false };
+        }
+    };
+
+    const rejectSettlement = async (id, reason) => {
+        try {
+            const res = await fetch(`${API_BASE}/wallet/settlements/${id}/reject`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ reason })
+            });
+            if (res.ok) {
+                await fetchSettlements('pending');
+                return { success: true };
+            }
+        } catch (err) {
+            return { success: false };
+        }
+    };
+
+    const addQrCode = async (formData) => {
+        try {
+            const token = sessionStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE}/qrcodes`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            if (res.ok) await fetchData();
+        } catch (err) {
+            console.error("Add QR code failed", err);
+        }
+    };
+
+    const bulkAddQrCodes = async (formData) => {
+        try {
+            const token = sessionStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE}/qrcodes/bulk`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            if (res.ok) await fetchData();
+            return await res.json();
+        } catch (err) {
+            console.error("Bulk QR onboarding failed", err);
+            return { success: false, error: "Server error" };
+        }
+    };
+
+    const updateQrCode = async (id, qrData) => {
+        console.log(`Updating QR ${id} with:`, qrData);
+        try {
+            const res = await fetch(`${API_BASE}/qrcodes/${id}`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify(qrData)
+            });
+            console.log(`Update QR response: ${res.status}`);
+            if (res.ok) await fetchData();
+            else {
+                const errData = await res.json();
+                console.error("Update QR failed server-side:", errData);
+            }
+        } catch (err) {
+            console.error("Update QR network error:", err);
+        }
+    };
+
+    const deleteQrCode = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this QR code?")) return;
+        try {
+            const res = await fetch(`${API_BASE}/qrcodes/${id}`, {
+                method: 'DELETE',
+                headers: getHeaders()
+            });
+            if (res.ok) await fetchData();
+        } catch (err) {
+            console.error("Delete QR code failed", err);
+        }
+    };
+
+    const assignQrByTid = async (tid, merchantId) => {
+        try {
+            const res = await fetch(`${API_BASE}/qrcodes/assign-by-tid`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ tid, merchantId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            }
+            return { success: false, error: data.error };
+        } catch (err) {
+            console.error("Assign QR by TID failed", err);
+            return { success: false, error: "Server error" };
+        }
+    };
+
+    const assignQrByIds = async (ids, merchantId) => {
+        try {
+            const res = await fetch(`${API_BASE}/qrcodes/assign-by-ids`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ ids, merchantId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            }
+            return { success: false, error: data.error };
+        } catch (err) {
+            console.error("Assign QR by IDs failed", err);
+            return { success: false, error: "Server error" };
+        }
+    };
+
+    const uploadReport = async (file) => {
+        const formData = new FormData();
+        formData.append('report', file);
+
+        try {
+            const token = sessionStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE}/reports/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }, // No content-type for FormData
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            }
+            return { success: false, error: data.error };
+        } catch (err) {
+            console.error("Report upload failed", err);
+            return { success: false, error: "Server error" };
+        }
+    };
+
+    const generateApiKey = (environment = 'sandbox') => {
+        return environment === 'production' ? 'tl_live_backend_gen_key' : 'tl_test_backend_gen_key';
+    };
+
+    const getSystemSetting = async (key) => {
+        try {
+            // We fetch all settings for now since it's a small map
+            const res = await fetch(`${API_BASE}/settings`, {
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                return data[key];
+            }
+        } catch (err) {
+            console.error("Failed to fetch setting", err);
+        }
+        return null; // or default
+    };
 
     return (
         <AppContext.Provider value={{
-            ...appState,
-            theme,
-            toggleTheme,
+            wallet,
+            merchants,
+            qrCodes,
+            transactions,
+            walletHistory,
+            loading,
             addFunds,
             requestFunds,
-            addMerchant,
-            updateMerchantStatus,
-            deleteMerchant,
-            addQrCode,
-            resetData
+            addMerchant, updateMerchantStatus, deleteMerchant,
+            addBankAccount, deleteBankAccount, bankAccounts,
+            requestSettlement, fetchSettlements, settlements,
+            approveSettlement, rejectSettlement,
+            fetchFundRequests, approveFundRequest, rejectFundRequest, fundRequests,
+            bulkAddQrCodes, addQrCode, assignQrByTid, assignQrByIds,
+            updateQrCode,
+            deleteQrCode,
+            uploadReport,
+            generateApiKey,
+            getSystemSetting,
+            fetchData
         }}>
             {children}
         </AppContext.Provider>

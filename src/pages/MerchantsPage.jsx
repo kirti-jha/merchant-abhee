@@ -9,7 +9,7 @@ import './MerchantsPage.css';
 const MerchantsPage = () => {
   const [showModal, setShowModal] = useState(false);
   const { merchants, addMerchant, updateMerchantStatus, deleteMerchant } = useAppContext();
-  const { loginAsMerchant } = useAuth();
+  const { getImpersonateToken } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -32,6 +32,15 @@ const MerchantsPage = () => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleLoginAs = async (m) => {
+    const result = await getImpersonateToken(m.id);
+    if (result.success) {
+      window.open(`${window.location.origin}/?token=${result.token}`, '_blank');
+    } else {
+      alert(result.message || 'Failed to login as merchant');
+    }
   };
 
   const handleCreate = (e) => {
@@ -108,27 +117,29 @@ const MerchantsPage = () => {
                 <tbody>
                   {merchants.filter(m => {
                     if (activeTab !== 'All' && m.status !== activeTab) return false;
-                    if (searchTerm && !m.name.toLowerCase().includes(searchTerm.toLowerCase()) && !m.email.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                    const nameMatch = m.fullName?.toLowerCase().includes(searchTerm.toLowerCase());
+                    const emailMatch = m.email?.toLowerCase().includes(searchTerm.toLowerCase());
+                    if (searchTerm && !nameMatch && !emailMatch) return false;
                     return true;
                   }).map((m) => (
                     <tr key={m.id}>
                       <td>
                         <div className="merchant-name-cell">
-                          <div className="merchant-avatar">{m.name.charAt(0)}</div>
+                          <div className="merchant-avatar">{m.fullName?.charAt(0) || '?'}</div>
                           <div className="merchant-name-info">
-                            <div className="m-name">{m.name}</div>
+                            <div className="m-name">{m.fullName}</div>
                             <div className="m-email">{m.email}</div>
                           </div>
                         </div>
                       </td>
                       <td><span className="mid-badge">{m.mid || 'MID-102938'}</span></td>
-                      <td className="volume-cell">₹ {m.wallet || '0.00'}</td>
-                      <td><span className={`status-pill ${m.status.toLowerCase()}`}>{m.status}</span></td>
+                      <td className="volume-cell">₹ {m.walletBalance || '0.00'}</td>
+                      <td><span className={`status-pill ${m.status?.toLowerCase() || 'active'}`}>{m.status}</span></td>
                       <td style={{fontSize: '12px', fontWeight: '600'}}>1.2%</td>
                       <td>
                         <div className="merchant-actions">
-                          <button className="action-btn login-btn" onClick={() => { loginAsMerchant(m); navigate('/dashboard'); }}>Login</button>
-                          <button className="action-btn" onClick={() => updateMerchantStatus(m.id, m.status === 'Active' ? 'Inactive' : 'Active')}>Toggle</button>
+                          <button className="action-btn login-btn" onClick={() => handleLoginAs(m)}>Login</button>
+                          <button className="action-btn" onClick={() => updateMerchantStatus(m.id, m.status?.toLowerCase() === 'active' ? 'inactive' : 'active')}>Toggle</button>
                           <button className="action-btn danger-btn" onClick={() => deleteMerchant(m.id)}>Delete</button>
                         </div>
                       </td>

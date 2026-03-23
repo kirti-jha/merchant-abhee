@@ -12,7 +12,10 @@ import './index.css';
 
 import ReconciliationPage from './pages/ReconciliationPage';
 import QrCodesAdminPage from './pages/QrCodesAdminPage';
+import SettlementsAdminPage from './pages/SettlementsAdminPage';
+import FundRequestsAdminPage from './pages/FundRequestsAdminPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
+import MerchantSettingsPage from './pages/MerchantSettingsPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
@@ -35,7 +38,7 @@ function App() {
           <Route path="/qr-codes" element={<ProtectedRoute requiredRole="merchant"><QrCodesPage /></ProtectedRoute>} />
           <Route path="/wallet" element={<ProtectedRoute requiredRole="merchant"><WalletPage /></ProtectedRoute>} />
           <Route path="/api-services" element={<ProtectedRoute requiredRole="merchant"><ApiServicesPage /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute requiredRole="merchant"><DashboardPage /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute requiredRole="merchant"><MerchantSettingsPage /></ProtectedRoute>} />
 
           {/* Admin Protected Routes */}
           <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
@@ -43,6 +46,8 @@ function App() {
           <Route path="/admin/merchants" element={<ProtectedRoute requiredRole="admin"><MerchantsPage /></ProtectedRoute>} />
           <Route path="/admin/wallet" element={<ProtectedRoute requiredRole="admin"><WalletPage /></ProtectedRoute>} />
           <Route path="/admin/reconciliation" element={<ProtectedRoute requiredRole="admin"><ReconciliationPage /></ProtectedRoute>} />
+          <Route path="/admin/settlements" element={<ProtectedRoute requiredRole="admin"><SettlementsAdminPage /></ProtectedRoute>} />
+          <Route path="/admin/fund-requests" element={<ProtectedRoute requiredRole="admin"><FundRequestsAdminPage /></ProtectedRoute>} />
           <Route path="/admin/qr-codes" element={<ProtectedRoute requiredRole="admin"><QrCodesAdminPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettingsPage /></ProtectedRoute>} />
           

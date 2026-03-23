@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Prisma
+/backend/node_modules
+/backend/prisma/migrations
+/backend/dist
+/backend/.env
+/backend/*.txt
+/backend/*.log
+/backend/*.js
+!/backend/src/**/*.js
+
+# Uploads
+/backend/uploads/qrcodes/*
+!/backend/uploads/qrcodes/.gitkeep

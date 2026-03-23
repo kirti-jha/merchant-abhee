@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './LoginPage.css';
@@ -6,7 +6,7 @@ import './LoginPage.css';
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,11 +14,21 @@ const LoginPage = () => {
 
   const isAdminLogin = location.pathname.includes('/admin');
 
-  const handleLogin = (e) => {
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     
-    const result = login(email, password);
+    const result = await login(email, password);
 
     if (result.success) {
       if (result.role === 'admin') {

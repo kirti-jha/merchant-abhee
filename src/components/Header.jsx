@@ -1,23 +1,64 @@
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { useAppContext } from '../context/AppContext';
 import './Header.css';
 
-const Header = () => {
+const Header = ({ title }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
+  const { fetchData } = useAppContext();
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
+
   const isAdmin = location.pathname.startsWith('/admin');
+
+  useEffect(() => {
+    const fetchNotifs = async () => {
+        try {
+            const token = sessionStorage.getItem('authToken');
+            const res = await fetch('http://localhost:4001/api/notifications', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) setNotifications(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch notifications", err);
+        }
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 10000); // Polling every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const handleSettingsClick = () => {
     navigate(isAdmin ? '/admin/settings' : '/settings');
   };
 
-  const { user } = { user: { name: 'Admin', role: 'admin' } }; // Use actual auth context if available
+  const markRead = async (id) => {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        await fetch(`http://localhost:4001/api/notifications/${id}/read`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setNotifications(notifications.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (e) {}
+  };
+
+  const displayName = user?.name || (isAdmin ? 'Admin' : 'User');
+  const avatarLetter = displayName.charAt(0).toUpperCase();
+  const roleLabel = user?.role === 'admin' ? 'Super Admin' : (user?.role === 'merchant' ? 'Merchant' : 'User');
 
   return (
-    <header className="main-header">
+    <header className="main-header" aria-label={title || 'Header'}>
       <div className="header-left">
-        <button className="menu-toggle">
+        <button className="menu-toggle" type="button" aria-label="Open menu">
           <span className="control-icon">☰</span>
         </button>
         <div className="header-search">
@@ -25,33 +66,64 @@ const Header = () => {
           <input type="text" placeholder="Search transactions, merchants..." />
         </div>
       </div>
-      
+
       <div className="header-right">
-        <div className="header-control language-selector">
-          <span className="control-icon">🌐</span>
-          <span className="control-text">EN</span>
+        <div style={{ position: 'relative' }}>
+          <button 
+            className="header-icon-btn" 
+            type="button" 
+            aria-label="Notifications" 
+            onClick={() => setShowNotifMenu(!showNotifMenu)}
+          >
+            <span>🔔</span>
+            {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+          </button>
+
+          {showNotifMenu && (
+            <div className="notif-dropdown card animated-scale-up" style={{
+                position: 'absolute', top: '100%', right: 0, width: '320px', 
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderRadius: '16px', marginTop: '12px', zIndex: 100,
+                maxHeight: '400px', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+            }}>
+              <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ margin: 0 }}>Notifications</h4>
+                <span style={{ fontSize: '11px', color: 'var(--text-mute)' }}>{notifications.length} recent</span>
+              </div>
+              {notifications.length === 0 ? (
+                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-mute)' }}>No notifications</div>
+              ) : (
+                notifications.map(n => (
+                  <div 
+                    key={n.id} 
+                    onClick={() => markRead(n.id)}
+                    style={{ 
+                      padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                      background: n.isRead ? 'transparent' : 'rgba(124,108,248,0.05)'
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '2px', color: n.isRead ? 'var(--text-p)' : 'var(--text-h)' }}>{n.title}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-p)', opacity: 0.8 }}>{n.message}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-mute)', marginTop: '4px' }}>{new Date(n.createdAt).toLocaleString()}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
-        <button className="header-icon-btn">
-          <span>🔔</span>
-          <span className="notif-badge">3</span>
-        </button>
-
-        <button className="theme-toggle" onClick={toggleTheme}>
-          {theme === 'light' ? '🌙' : '☀️'}
-        </button>
-
-        <div className="header-user-chip" onClick={handleSettingsClick}>
-          <div className="header-avatar">A</div>
+        <button className="header-user-chip" type="button" onClick={handleSettingsClick}>
+          <div className="header-avatar" aria-hidden="true">{avatarLetter}</div>
           <div className="header-user-info">
-            <span className="header-user-name">Admin</span>
-            <span className="header-user-role">Super Admin</span>
+            <span className="header-user-name">{displayName}</span>
+            <span className="header-user-role">{roleLabel}</span>
           </div>
-          <span className="header-arrow">▼</span>
-        </div>
+          <span className="header-arrow" aria-hidden="true">▼</span>
+        </button>
       </div>
     </header>
   );
 };
 
 export default Header;
+

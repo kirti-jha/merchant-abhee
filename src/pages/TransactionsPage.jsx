@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useAppContext } from '../context/AppContext';
@@ -6,59 +6,71 @@ import './TransactionsPage.css';
 
 const TransactionsPage = () => {
   const { transactions } = useAppContext();
-  const [filter, setFilter] = React.useState('All');
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
 
-  const handleExport = () => {
-    alert('Exporting transactions as CSV...');
-  };
+  const filteredTransactions = useMemo(() => {
+    return (transactions || []).filter(tx => {
+      if (!tx) return false;
+      const txId = (tx.id || '').toString().toLowerCase();
+      const txDesc = (tx.description || '').toString().toLowerCase();
+      const matchesSearch = txId.includes(searchTerm.toLowerCase()) || txDesc.includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'All' || tx.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [transactions, searchTerm, statusFilter]);
+
+  const stats = useMemo(() => {
+    return {
+      total: (filteredTransactions || []).length,
+      volume: (filteredTransactions || []).reduce((sum, tx) => {
+          const amt = Number(tx.amount) || 0;
+          return sum + (tx.type === 'credit' ? amt : -amt);
+      }, 0)
+    };
+  }, [filteredTransactions]);
 
   return (
     <div className="dashboard-layout">
       <Sidebar />
       <div className="main-content">
         <Header />
+        
         <main className="dashboard-body animated">
           <div className="transactions-page-header">
-            <div className="transactions-title text-section">
-              <h2>Transactions Explorer</h2>
-              <p>Search and manage all platform transactions.</p>
+            <div className="transactions-title">
+              <h2>Transaction History</h2>
+              <p>Monitor and manage all your platform activities in real-time.</p>
             </div>
             
             <div className="transactions-header-actions">
-              <input 
-                type="text" 
-                className="txn-filter-input" 
-                placeholder="Search by RRN, ID..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <button className="export-btn" onClick={handleExport}>
-                <span>📥</span> Export CSV
+              <button className="export-btn">
+                <span>📊</span> Export CSV
               </button>
             </div>
           </div>
 
-          <div className="txn-table-card">
+          <div className="txn-table-card card">
             <div className="txn-toolbar">
               <div className="txn-search-wrap">
                 <span className="txn-search-icon">🔍</span>
                 <input 
                   type="text" 
                   className="txn-search-input" 
-                  placeholder="Quick search..." 
+                  placeholder="Search by ID or description..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              
               <div className="txn-filters">
-                {['All', 'Credit', 'Debit', 'Pending'].map(f => (
+                {['All', 'Completed', 'Pending', 'Failed'].map(filter => (
                   <button 
-                    key={f} 
-                    className={`txn-pill-filter ${f === filter ? 'active' : ''}`}
-                    onClick={() => setFilter(f)}
+                    key={filter}
+                    className={`txn-pill-filter ${statusFilter === filter ? 'active' : ''}`}
+                    onClick={() => setStatusFilter(filter)}
                   >
-                    {f}
+                    {filter}
                   </button>
                 ))}
               </div>
@@ -68,47 +80,52 @@ const TransactionsPage = () => {
               <table className="transactions-table">
                 <thead>
                   <tr>
-                    <th>Ref No (RRN)</th>
                     <th>Date & Time</th>
+                    <th>RRN No</th>
+                    <th>Trans. ID</th>
+                    <th>Description</th>
+                    <th>Mobile</th>
                     <th>Type</th>
                     <th>Amount</th>
-                    <th>Description</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                   {transactions.filter(tx => {
-                    const matchesFilter = filter === 'All' || tx.type.toLowerCase() === filter.toLowerCase() || tx.status.toLowerCase() === filter.toLowerCase();
-                    const matchesSearch = tx.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                        tx.description.toLowerCase().includes(searchTerm.toLowerCase());
-                    return matchesFilter && matchesSearch;
-                  }).map((tx) => (
+                  {(filteredTransactions || []).map(tx => (
                     <tr key={tx.id}>
-                      <td className="txn-id-cell">{tx.id}</td>
-                      <td className="date-cell">{new Date(tx.date).toLocaleString()}</td>
-                      <td style={{textTransform: 'uppercase', fontWeight: '600', fontSize: '12px'}}>{tx.type}</td>
-                      <td className={`txn-amount-cell ${tx.type === 'credit' ? 'txn-amount-credit' : 'txn-amount-debit'}`}>
-                        {tx.type === 'debit' ? '-' : '+'}₹{Math.abs(tx.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                      <td>{tx.createdAt || tx.date ? new Date(tx.createdAt || tx.date).toLocaleString() : '—'}</td>
+                      <td className="txn-id-cell">{(tx.refId || (tx.id || '').slice(0, 8)) || '—'}</td>
+                      <td>{tx.clientRefId || '—'}</td>
+                      <td>{tx.description || '—'}</td>
+                      <td>{tx.consumer || '—'}</td>
+                      <td><span style={{textTransform: 'capitalize'}}>{tx.type || '—'}</span></td>
+                      <td className={`txn-amount-cell ${(tx.type || '').toLowerCase() === 'credit' ? 'txn-amount-credit' : 'txn-amount-debit'}`}>
+                        {tx.type === 'debit' || Number(tx.amount) < 0 ? '-' : '+'}₹ {Math.abs(Number(tx.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}
                       </td>
-                      <td>{tx.description}</td>
-                      <td><span className={`status-pill ${tx.status.toLowerCase()}`}>{tx.status}</span></td>
+                      <td>
+                        <span className={`status-badge ${(tx.status || 'Pending').toLowerCase()}`}>
+                          {tx.status || 'Pending'}
+                        </span>
+                      </td>
                     </tr>
                   ))}
-                  {transactions.length === 0 && (
+                  {filteredTransactions.length === 0 && (
                     <tr>
-                      <td colSpan="6" style={{textAlign: 'center', padding: '3rem', color: 'var(--text-mute)'}}>No transaction records found.</td>
+                      <td colSpan="5" style={{textAlign: 'center', padding: '3rem', color: 'var(--text-mute)'}}>
+                        No transactions match your filters.
+                      </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            
+
             <div className="txn-table-footer">
-              <span className="txn-count-text">Showing {transactions.length} total entries</span>
-              <div className="pagination-v2">
-                <button className="nav-btn-v2">Previous</button>
-                <button className="nav-num-v2 active">1</button>
-                <button className="nav-btn-v2">Next</button>
+              <div className="txn-count-text">
+                Showing {filteredTransactions.length} of {transactions.length} records
+              </div>
+              <div className="txn-summary-text" style={{fontWeight: '600', color: 'var(--text-h)'}}>
+                Net Flow: ₹ {stats.volume.toLocaleString(undefined, {minimumFractionDigits: 2})}
               </div>
             </div>
           </div>

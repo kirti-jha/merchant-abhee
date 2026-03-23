@@ -14,9 +14,13 @@ const ProtectedRoute = ({ children, requiredRole }) => {
         return <Navigate to={requiredRole === 'admin' ? "/admin/login" : "/login"} replace />;
     }
 
-    if (requiredRole && user?.role !== requiredRole) {
+    const normalizeRole = (r) => r === 'retailer' ? 'merchant' : r;
+    const userRole = normalizeRole(user?.role);
+    const expectedRole = normalizeRole(requiredRole);
+
+    if (requiredRole && userRole !== expectedRole) {
         // User logged in but wrong role (e.g., merchant trying to access admin)
-        return <Navigate to={user?.role === 'admin' ? "/admin/dashboard" : "/dashboard"} replace />;
+        return <Navigate to={userRole === 'admin' ? "/admin/dashboard" : "/dashboard"} replace />;
     }
 
     return children;

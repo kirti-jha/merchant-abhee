@@ -191,6 +191,37 @@
 
 .drop-sub { font-size: 0.8125rem; color: var(--text-mute); }
 
+.selected-filename {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 0.5rem 0;
+}
+
+.drop-img-icon.success {
+  color: var(--success);
+  opacity: 1;
+  text-shadow: 0 0 15px rgba(34,197,94,0.3);
+}
+
+.clear-file-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: all 0.2s;
+}
+
+.clear-file-btn:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
 /* Form */
 .qr-form-v2 {
   padding: 0 1.5rem 1.5rem;
@@ -633,4 +664,11 @@
   border-radius: 4px;
   color: var(--accent);
   font-family: monospace;
+}
+
+.qr-dropzone-v2.dragging {
+  border-color: var(--primary);
+  background: var(--primary-dim);
+  box-shadow: 0 0 20px rgba(124, 108, 248, 0.15);
+  transform: scale(1.01);
 }

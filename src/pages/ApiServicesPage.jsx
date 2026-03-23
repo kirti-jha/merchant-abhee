@@ -1,9 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import { useAppContext } from '../context/AppContext';
+import { copyTextToClipboard } from '../utils/clipboard';
 import './DashboardPage.css';
 
 const ApiServicesPage = () => {
+  const { apiKeys, generateApiKey } = useAppContext();
+  const [copied, setCopied] = useState(null);
+
+  const handleCopy = async (value, label) => {
+    const ok = await copyTextToClipboard(value);
+    setCopied(ok ? label : 'Copy failed');
+    window.setTimeout(() => setCopied(null), 1500);
+  };
+
+  const handleGenerate = () => {
+    generateApiKey('sandbox');
+    generateApiKey('production');
+  };
+
   return (
     <div className="dashboard-layout">
       <Sidebar />
@@ -13,22 +29,28 @@ const ApiServicesPage = () => {
           <div className="card" style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2>Developer API Keys</h2>
-              <button className="btn-primary">Generate New Key</button>
+              <button className="btn-primary" type="button" onClick={handleGenerate}>Generate New Key</button>
             </div>
+
+            {copied && (
+              <div style={{ marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                {copied === 'Copy failed' ? 'Copy failed. Please try again.' : `${copied} copied.`}
+              </div>
+            )}
             
             <div className="form-group" style={{ marginBottom: '2rem' }}>
               <label>Sandbox API Key</label>
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <input type="text" className="input-field" value="tl_test_51MzS2vLDR9XzJQo0N5..." readOnly />
-                <button className="btn-secondary">Copy</button>
+                <input type="text" className="input-field" value={apiKeys?.sandbox || ''} readOnly />
+                <button className="btn-secondary" type="button" onClick={() => handleCopy(apiKeys?.sandbox || '', 'Sandbox API key')}>Copy</button>
               </div>
             </div>
 
             <div className="form-group">
               <label>Production API Key</label>
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <input type="text" className="input-field" value="tl_live_92Kb4xRMT6Wp..." readOnly />
-                <button className="btn-secondary">Copy</button>
+                <input type="text" className="input-field" value={apiKeys?.production || ''} readOnly />
+                <button className="btn-secondary" type="button" onClick={() => handleCopy(apiKeys?.production || '', 'Production API key')}>Copy</button>
               </div>
             </div>
           </div>

@@ -23,24 +23,24 @@ const AdminDashboard = () => {
 
   const metrics = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
-    const todaysTxns = transactions.filter(t => t.date.startsWith(today));
+    const todaysTxns = (transactions || []).filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(today));
     
-    // Derived dummy info for charts based on state
-    const successCount = transactions.filter(t => t.status === 'Completed').length;
-    const failCount = transactions.length - successCount;
+    // Derived info for charts based on state
+    const successCount = (transactions || []).filter(t => t && t.status === 'Completed').length;
+    const failCount = (transactions || []).length - successCount;
     const statusData = [
-      { name: 'Success', value: successCount || 80 },
-      { name: 'Failed', value: failCount || 20 },
+      { name: 'Success', value: successCount || 1 },
+      { name: 'Failed', value: failCount || 0 },
     ];
     
     return {
       todaysCount: todaysTxns.length,
-      todaysVolume: todaysTxns.reduce((sum, t) => sum + Math.abs(t.amount), 0),
-      totalMerchants: merchants.length,
-      successRate: transactions.length ? ((successCount / transactions.length) * 100).toFixed(1) : '0.0',
-      activeQrs: qrCodes.filter(q => q.status === 'Active').length,
+      todaysVolume: todaysTxns.reduce((sum, t) => sum + (Math.abs(Number(t.amount)) || 0), 0),
+      totalMerchants: (merchants || []).length,
+      successRate: (transactions || []).length ? ((successCount / transactions.length) * 100).toFixed(1) : '0.0',
+      activeQrs: (qrCodes || []).filter(q => q && q.status === 'Active').length,
       statusData,
-      successPercent: transactions.length ? Math.round((successCount / transactions.length) * 100) : 0
+      successPercent: (transactions || []).length ? Math.round((successCount / transactions.length) * 100) : 0
     };
   }, [transactions, merchants, qrCodes]);
   return (
