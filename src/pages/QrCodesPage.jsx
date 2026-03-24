@@ -12,7 +12,7 @@ const QrCodesPage = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('My QR');
   const [dynamicAmount, setDynamicAmount] = useState('');
-  const [showFixModal, setShowFixModal] = useState(false);
+  const [fixingQr, setFixingQr] = useState(null); // Tracks the specific QR being fixed
   const [manualUpi, setManualUpi] = useState('');
   const [isFixing, setIsFixing] = useState(false);
 
@@ -20,7 +20,7 @@ const QrCodesPage = () => {
     setIsFixing(true);
     try {
         await updateQrCode(id, { upiId });
-        setShowFixModal(false);
+        setFixingQr(null);
         setManualUpi('');
         alert("UPI ID updated successfully!");
     } catch (err) {
@@ -148,7 +148,7 @@ const QrCodesPage = () => {
                                         Invalid QR Code<br/><span style={{fontWeight: '400', color: '#64748b'}}>Quality issue detected</span>
                                     </p>
                                     <button 
-                                        onClick={() => setShowFixModal(true)}
+                                        onClick={() => setFixingQr(activeQr)}
                                         style={{
                                             background: '#8b5cf6',
                                             color: 'white',
@@ -216,79 +216,83 @@ const QrCodesPage = () => {
                 )}
               </div>
 
-              {/* Fix Modal */}
-              {showFixModal && (
-                <div style={{
-                    position: 'fixed',
-                    inset: 0,
-                    background: 'rgba(0,0,0,0.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <div style={{
-                        background: 'white',
-                        padding: '30px',
-                        borderRadius: '24px',
-                        width: '90%',
-                        maxWidth: '400px',
-                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
-                    }}>
-                        <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>Fix Invalid QR</h2>
-                        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
-                            Aapki photo thodi dhundli hai isliye system usey "read" nahi kar pa raha. Bas ek baar niche **UPI VPA** type karke save kar dijiye.
-                        </p>
-                        
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Merchant UPI VPA</label>
-                            <input 
-                                type="text"
-                                placeholder="example@paytm or 9123456789@upi"
-                                value={manualUpi}
-                                onChange={(e) => setManualUpi(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 16px',
-                                    borderRadius: '12px',
-                                    border: '2px solid #e2e8f0',
-                                    fontSize: '16px',
-                                    outline: 'none',
-                                    transition: 'border-color 0.2s'
-                                }}
-                            />
-                        </div>
+            </>
+          )}
 
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button 
-                                onClick={() => setShowFixModal(false)}
-                                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#f1f5f9', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                onClick={() => updateUpiId(activeQr.id, manualUpi)}
-                                disabled={isFixing || !manualUpi.includes('@')}
-                                style={{ 
-                                    flex: 1, 
-                                    padding: '12px', 
-                                    borderRadius: '12px', 
-                                    border: 'none', 
-                                    background: '#8b5cf6', 
-                                    color: 'white', 
-                                    fontWeight: '600', 
-                                    cursor: 'pointer',
-                                    opacity: (isFixing || !manualUpi.includes('@')) ? 0.5 : 1
-                                }}
-                            >
-                                {isFixing ? 'Saving...' : 'Verify & Upgrade'}
-                            </button>
-                        </div>
+          {/* Fix Modal - Moved OUT of conditional tab block so it works everywhere */}
+          {fixingQr && (
+            <div style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+                backdropFilter: 'blur(4px)'
+            }}>
+                <div style={{
+                    background: 'white',
+                    padding: '30px',
+                    borderRadius: '24px',
+                    width: '90%',
+                    maxWidth: '400px',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+                }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>Fix Invalid QR ({fixingQr.label})</h2>
+                    <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+                        Aapki photo thodi dhundli hai isliye system usey "read" nahi kar pa raha. Bas ek baar niche **UPI VPA** type karke save kar dijiye.
+                    </p>
+                    
+                    <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Merchant UPI VPA</label>
+                        <input 
+                            type="text"
+                            placeholder="example@paytm or 9123456789@upi"
+                            value={manualUpi}
+                            onChange={(e) => setManualUpi(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                border: '2px solid #e2e8f0',
+                                fontSize: '16px',
+                                outline: 'none',
+                                transition: 'border-color 0.2s'
+                            }}
+                        />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button 
+                            onClick={() => {
+                                setFixingQr(null);
+                                setManualUpi('');
+                            }}
+                            style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#f1f5f9', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={() => updateUpiId(fixingQr.id, manualUpi)}
+                            disabled={isFixing || !manualUpi.includes('@')}
+                            style={{ 
+                                flex: 1, 
+                                padding: '12px', 
+                                borderRadius: '12px', 
+                                border: 'none', 
+                                background: '#8b5cf6', 
+                                color: 'white', 
+                                fontWeight: '600', 
+                                cursor: 'pointer',
+                                opacity: (isFixing || !manualUpi.includes('@')) ? 0.5 : 1
+                            }}
+                        >
+                            {isFixing ? 'Saving...' : 'Verify & Upgrade'}
+                        </button>
                     </div>
                 </div>
-              )}
-            </>
+            </div>
           )}
 
           {activeTab === 'Dynamic' && (
@@ -386,7 +390,7 @@ const QrCodesPage = () => {
                             <button 
                                 onClick={() => {
                                     setManualUpi('');
-                                    setShowFixModal(true);
+                                    setFixingQr(q);
                                 }}
                                 style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: '#8b5cf6', color: 'white', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                             >
