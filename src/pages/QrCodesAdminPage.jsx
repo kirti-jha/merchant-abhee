@@ -33,7 +33,13 @@ const QrCodesAdminPage = () => {
   const [isAssigning, setIsAssigning] = useState(false);
 
   const fileInputRef = useRef(null);
-  const { qrCodes, addQrCode, bulkAddQrCodes, assignQrByTid, assignQrByIds, merchants, deleteQrCode, updateQrCode } = useAppContext();
+  const { 
+    qrCodes, addQrCode, bulkAddQrCodes, assignQrByTid, assignQrByIds, 
+    unassignQrCode, merchants, deleteQrCode, updateQrCode 
+  } = useAppContext();
+
+  console.log("QR Admin Page - Merchants:", merchants.length);
+  console.log("QR Admin Page - QR Codes:", qrCodes.length);
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -528,8 +534,10 @@ const QrCodesAdminPage = () => {
                               <div 
                                 key={q.id} 
                                 style={{ padding: '10px 12px', cursor: 'pointer', color: '#e5e7eb', fontSize: '13px', borderBottom: '1px solid #374151', transition: 'background 0.2s' }}
-                                onClick={() => {
-                                  setSelectedTids(prev => [...prev, q.tid]);
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); // Stop onBlur from firing first
+                                  console.log("Selected TID from suggest:", q.tid);
+                                  setSelectedTids(prev => [...new Set([...prev, q.tid])]);
                                   setAssignTidInput('');
                                   setShowTidSuggestions(false);
                                 }}
@@ -611,27 +619,34 @@ const QrCodesAdminPage = () => {
                       <th style={{ width: '40px' }}>
                         <input 
                           type="checkbox" 
-                          onChange={e => {
-                            const pageItems = qrCodes
-                              .filter(q => {
+                          checked={(() => {
+                            const filteredIds = qrCodes.filter(q => {
                                 if (statusFilter !== 'All' && q.status?.toLowerCase() !== statusFilter.toLowerCase()) return false;
                                 if (assignFilter === 'Assigned' && q.merchantName === 'Unassigned') return false;
                                 if (assignFilter === 'Unassigned' && q.merchantName !== 'Unassigned') return false;
                                 return true;
-                              })
-                              .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+                            }).map(q => q.id);
+                            return filteredIds.length > 0 && filteredIds.every(id => selectedQrIds.includes(id));
+                          })()}
+                          onChange={e => {
+                            const filteredQrs = qrCodes.filter(q => {
+                                if (statusFilter !== 'All' && q.status?.toLowerCase() !== statusFilter.toLowerCase()) return false;
+                                if (assignFilter === 'Assigned' && q.merchantName === 'Unassigned') return false;
+                                if (assignFilter === 'Unassigned' && q.merchantName !== 'Unassigned') return false;
+                                return true;
+                            });
                             if (e.target.checked) {
-                              setSelectedQrIds(prev => [...new Set([...prev, ...pageItems.map(q => q.id)])]);
+                              setSelectedQrIds(prev => [...new Set([...prev, ...filteredQrs.map(q => q.id)])]);
                             } else {
-                              const pageIds = pageItems.map(q => q.id);
-                              setSelectedQrIds(prev => prev.filter(id => !pageIds.includes(id)));
+                              const filteredIds = filteredQrs.map(q => q.id);
+                              setSelectedQrIds(prev => prev.filter(id => !filteredIds.includes(id)));
                             }
                           }}
                         />
                       </th>
                       <th>UPI Handle</th>
                       <th>Assigned Merchant</th>
-                      <th>Label &amp; MID/TID</th>
+                      <th>Label & TID/MID</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
@@ -649,13 +664,28 @@ const QrCodesAdminPage = () => {
                       return (
                         <>
                           {filteredQrs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(item => (
-                            <tr key={item.id} style={{ background: selectedQrIds.includes(item.id) ? 'rgba(124,108,248,0.08)' : 'transparent' }}>
-                              <td>
+                            <tr 
+                              key={item.id} 
+                              onClick={() => {
+                                console.log("Row Click - Toggling ID:", item.id);
+                                if (selectedQrIds.includes(item.id)) {
+                                  setSelectedQrIds(prev => prev.filter(id => id !== item.id));
+                                } else {
+                                  setSelectedQrIds(prev => [...prev, item.id]);
+                                }
+                              }}
+                              style={{ 
+                                background: selectedQrIds.includes(item.id) ? 'rgba(124,108,248,0.12)' : 'transparent',
+                                cursor: 'pointer',
+                                transition: 'background 0.2s'
+                              }}
+                            >
+                              <td onClick={(e) => e.stopPropagation()}>
                                 <input 
                                   type="checkbox" 
                                   checked={selectedQrIds.includes(item.id)}
                                   onChange={e => {
-                                    if (e.target.checked) setSelectedQrIds(prev => [...prev, item.id]);
+                                    if (e.target.checked) setSelectedQrIds(prev => [...new Set([...prev, item.id])]);
                                     else setSelectedQrIds(prev => prev.filter(id => id !== item.id));
                                   }}
                                 />
@@ -690,72 +720,93 @@ const QrCodesAdminPage = () => {
                               </td>
                               <td>
                                 <div className="merchant-actions" style={{display: 'flex', gap: '8px'}}>
-                                  <button 
-                                    className={`action-btn ${item.status?.toLowerCase() === 'active' ? 'danger-btn' : 'success-btn'}`}
-                                    onClick={async (e) => {
-                                      const btn = e.currentTarget;
-                                      const originalText = btn.innerText;
-                                      btn.innerText = '...';
-                                      btn.disabled = true;
-                                      console.log("Toggling QR status:", item.id, item.status);
-                                      const newStatus = item.status?.toLowerCase() === 'active' ? 'disabled' : 'active';
-                                      await updateQrCode(item.id, { status: newStatus });
-                                      console.log("Status update requested for:", item.id);
-                                      // btn is removed/updated on re-render, so no need to reset manually if successful
-                                    }}
-                                    style={{
-                                      padding: '6px 12px', 
-                                      fontSize: '11px', 
-                                      fontWeight: '700',
-                                      minWidth: '85px',
-                                      background: item.status?.toLowerCase() === 'active' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
-                                      color: item.status?.toLowerCase() === 'active' ? '#ef4444' : '#10b981',
-                                      border: `1px solid ${item.status?.toLowerCase() === 'active' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`
-                                    }}
-                                  >
-                                    {item.status?.toLowerCase() === 'active' ? 'Deactivate' : 'Activate'}
-                                  </button>
-                                  <button onClick={() => deleteQrCode(item.id)} className="action-btn danger-btn" style={{padding: '6px 10px', fontSize: '12px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)'}}>Delete</button>
+                                    <button 
+                                      className={`action-btn ${item.status?.toLowerCase() === 'active' ? 'danger-btn' : 'success-btn'}`}
+                                      onClick={async (e) => {
+                                        const btn = e.currentTarget;
+                                        btn.innerText = '...';
+                                        btn.disabled = true;
+                                        const newStatus = item.status?.toLowerCase() === 'active' ? 'disabled' : 'active';
+                                        await updateQrCode(item.id, { status: newStatus });
+                                      }}
+                                      style={{
+                                        padding: '6px 12px', 
+                                        fontSize: '11px', 
+                                        fontWeight: '700',
+                                        minWidth: '85px',
+                                        background: item.status?.toLowerCase() === 'active' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+                                        color: item.status?.toLowerCase() === 'active' ? '#ef4444' : '#10b981',
+                                        border: `1px solid ${item.status?.toLowerCase() === 'active' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`
+                                      }}
+                                    >
+                                      {item.status?.toLowerCase() === 'active' ? 'Deactivate' : 'Activate'}
+                                    </button>
+                                    
+                                    {item.merchantId && (
+                                      <button 
+                                        onClick={() => {
+                                          if (window.confirm("Unassign this QR code and return to inventory?")) {
+                                            unassignQrCode(item.id);
+                                          }
+                                        }} 
+                                        className="action-btn" 
+                                        style={{padding: '6px 10px', fontSize: '11px', background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)', fontWeight: '700'}}
+                                      >
+                                        Unassign
+                                      </button>
+                                    )}
+
+                                    <button onClick={() => deleteQrCode(item.id)} className="action-btn danger-btn" style={{padding: '6px 10px', fontSize: '12px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)'}}>Delete</button>
                                 </div>
                               </td>
                             </tr>
                           ))}
                         </>
                       );
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-              
-              <div className="table-footer-v2">
-                <span className="showing-text">Inventory: {qrCodes.length} QR Codes registered</span>
-                <div className="pagination-v2">
-                   <button 
-                      className="nav-btn-v2" 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
-                      disabled={currentPage === 1}
-                   >
-                     Previous
-                   </button>
-                   <button className="nav-num-v2 active">{currentPage}</button>
-                   <button 
-                      className="nav-btn-v2" 
-                      onClick={() => setCurrentPage(p => p + 1)} 
-                      disabled={
-                        currentPage >= Math.ceil(
+                  })()}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="table-footer-v2">
+              <span className="showing-text">Inventory: {qrCodes.length} QR Codes registered</span>
+              <div className="pagination-v2">
+                 <button 
+                    className="nav-btn-v2" 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                    disabled={currentPage === 1}
+                 >
+                   Previous
+                 </button>
+                 <button className="nav-num-v2 active">{currentPage}</button>
+                 <button 
+                    className="nav-btn-v2" 
+                    onClick={() => {
+                        const maxPage = Math.ceil(
                           qrCodes.filter(q => {
                             if (statusFilter !== 'All' && q.status?.toLowerCase() !== statusFilter.toLowerCase()) return false;
                             if (assignFilter === 'Assigned' && q.merchantName === 'Unassigned') return false;
                             if (assignFilter === 'Unassigned' && q.merchantName !== 'Unassigned') return false;
                             return true;
                           }).length / itemsPerPage
-                        ) || qrCodes.length === 0
-                      }
-                   >
-                     Next
-                   </button>
-                </div>
+                        );
+                        if (currentPage < maxPage) setCurrentPage(p => p + 1);
+                    }} 
+                    disabled={
+                      currentPage >= Math.ceil(
+                        qrCodes.filter(q => {
+                          if (statusFilter !== 'All' && q.status?.toLowerCase() !== statusFilter.toLowerCase()) return false;
+                          if (assignFilter === 'Assigned' && q.merchantName === 'Unassigned') return false;
+                          if (assignFilter === 'Unassigned' && q.merchantName !== 'Unassigned') return false;
+                          return true;
+                        }).length / itemsPerPage
+                      ) || qrCodes.length === 0
+                    }
+                 >
+                   Next
+                 </button>
               </div>
+            </div>
 
               {/* Fixed Assign Bar — always visible at bottom when rows are selected */}
               {selectedQrIds.length > 0 && (

@@ -23,7 +23,11 @@ const AdminDashboard = () => {
 
   const metrics = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
-    const todaysTxns = (transactions || []).filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(today));
+    const todaysTxns = (transactions || []).filter(t => {
+      if (!t) return false;
+      const d = t.date || t.createdAt;
+      return d && typeof d === 'string' && d.startsWith(today);
+    });
     
     // Derived info for charts based on state
     const successCount = (transactions || []).filter(t => t && t.status === 'Completed').length;

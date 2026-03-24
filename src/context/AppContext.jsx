@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useAuth } from './AuthContext';
 
 const AppContext = createContext();
 const API_BASE = 'http://localhost:4001/api';
@@ -13,6 +14,7 @@ export const AppProvider = ({ children }) => {
     const [transactions, setTransactions] = useState([]); // Service Transactions
     const [walletHistory, setWalletHistory] = useState([]); // Wallet Movement History
     const [loading, setLoading] = useState(true);
+    const { isAuthenticated, user } = useAuth();
 
     const getHeaders = useCallback(() => {
         const token = sessionStorage.getItem('authToken');
@@ -74,8 +76,10 @@ export const AppProvider = ({ children }) => {
     }, [getHeaders]);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        if (isAuthenticated) {
+            fetchData();
+        }
+    }, [fetchData, isAuthenticated, user?.id]);
 
     const addFunds = async (amount) => {
         try {
@@ -402,6 +406,25 @@ export const AppProvider = ({ children }) => {
         }
     };
 
+    const unassignQrCode = async (id) => {
+        try {
+            const res = await fetch(`${API_BASE}/qrcodes/${id}/unassign`, {
+                method: 'POST',
+                headers: getHeaders()
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            }
+            return { success: false, error: data.error };
+        } catch (err) {
+            console.error("Unassign QR failed", err);
+            return { success: false, error: "Server error" };
+        }
+    };
+
+
     const uploadReport = async (file) => {
         const formData = new FormData();
         formData.append('report', file);
@@ -459,8 +482,9 @@ export const AppProvider = ({ children }) => {
             addBankAccount, deleteBankAccount, bankAccounts,
             requestSettlement, fetchSettlements, settlements,
             approveSettlement, rejectSettlement,
-            fetchFundRequests, approveFundRequest, rejectFundRequest, fundRequests,
+            approveFundRequest, rejectFundRequest, fundRequests,
             bulkAddQrCodes, addQrCode, assignQrByTid, assignQrByIds,
+            unassignQrCode,
             updateQrCode,
             deleteQrCode,
             uploadReport,

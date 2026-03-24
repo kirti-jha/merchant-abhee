@@ -1,16 +1,35 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import jsQR from 'jsqr';
 import './QrCodesPage.css';
 
 const QrCodesPage = () => {
-  const { qrCodes } = useAppContext();
+  const { qrCodes, updateQrCode, unassignQrCode } = useAppContext();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = React.useState('My QR');
-  const [dynamicAmount, setDynamicAmount] = React.useState('');
+  const [activeTab, setActiveTab] = useState('My QR');
+  const [dynamicAmount, setDynamicAmount] = useState('');
+  const [showFixModal, setShowFixModal] = useState(false);
+  const [manualUpi, setManualUpi] = useState('');
+  const [isFixing, setIsFixing] = useState(false);
+
+  const updateUpiId = async (id, upiId) => {
+    setIsFixing(true);
+    try {
+        await updateQrCode(id, { upiId });
+        setShowFixModal(false);
+        setManualUpi('');
+        alert("UPI ID updated successfully!");
+    } catch (err) {
+        console.error("Failed to update UPI ID:", err);
+        alert("Failed to update UPI ID. Please try again.");
+    } finally {
+        setIsFixing(false);
+    }
+  };
 
   // Filter QRs assigned to this merchant
   const myQrs = useMemo(() => {
@@ -18,10 +37,15 @@ const QrCodesPage = () => {
   }, [qrCodes, user]);
 
   // Rotate: Pick one random QR from the assigned set
+  // PREFERENCE: Prioritize QRs that are NOT MANUAL placeholders
   const activeQr = useMemo(() => {
     if (myQrs.length === 0) return null;
-    const randomIndex = Math.floor(Math.random() * myQrs.length);
-    return myQrs[randomIndex];
+    
+    const verifiedQrs = myQrs.filter(q => !q.upiId?.startsWith('MANUAL-UPI'));
+    const sourceList = verifiedQrs.length > 0 ? verifiedQrs : myQrs;
+    
+    const randomIndex = Math.floor(Math.random() * sourceList.length);
+    return sourceList[randomIndex];
   }, [myQrs]);
 
   // Calculate UPI String based on tab
@@ -70,24 +94,116 @@ const QrCodesPage = () => {
                 </div>
                 
                 <div className="qr-code-body">
-                  <div className="qr-frame" onClick={() => activeQr?.imagePath && window.open(`http://localhost:4001${activeQr.imagePath}`, '_blank')} style={{ cursor: activeQr?.imagePath ? 'zoom-in' : 'default' }}>
+                  <div className="qr-frame" style={{ 
+                      padding: '24px', 
+                      background: 'white', 
+                      borderRadius: '24px', 
+                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                      border: '1px solid #f1f5f9',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                  }}>
                     {activeQr ? (
-                        activeQr.imagePath ? (
-                          <img 
-                            src={`http://localhost:4001${activeQr.imagePath}`} 
-                            alt="Original QR" 
-                            style={{ width: '280px', height: '280px', objectFit: 'contain', borderRadius: '8px' }} 
-                          />
-                        ) : (
-                          <QRCodeSVG 
-                              value={upiString} 
-                              size={280}
-                              level="H"
-                              includeMargin={true}
-                          />
-                        )
+                      <>
+                        <div style={{ position: 'relative', width: '220px', height: '220px', overflow: 'hidden', borderRadius: '12px', background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {activeQr.imagePath ? (
+                                <img 
+                                    src={`http://localhost:4001${activeQr.imagePath}`} 
+                                    alt="Merchant QR" 
+                                    style={{ 
+                                        width: '100%', 
+                                        height: '100%', 
+                                        objectFit: (activeQr.upiId?.startsWith('MANUAL-UPI') || activeQr.type === 'bulk') ? 'cover' : 'contain',
+                                        transform: (activeQr.upiId?.startsWith('MANUAL-UPI') || activeQr.type === 'bulk') ? 'scale(1.8)' : 'none',
+                                        filter: 'contrast(1.1) brightness(1.02)'
+                                    }} 
+                                />
+                            ) : (
+                                <QRCodeSVG 
+                                    value={upiString} 
+                                    size={200}
+                                    level="H"
+                                    includeMargin={false}
+                                />
+                            )}
+
+                            {/* Overlay for Placeholder QR */}
+                            {activeQr.upiId?.startsWith('MANUAL-UPI') && (
+                                <div style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'rgba(255,255,255,0.92)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '20px',
+                                    textAlign: 'center',
+                                    backdropFilter: 'blur(2px)'
+                                }}>
+                                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>⚠️</div>
+                                    <p style={{ fontSize: '13px', color: '#1e293b', marginBottom: '12px', fontWeight: '700' }}>
+                                        Invalid QR Code<br/><span style={{fontWeight: '400', color: '#64748b'}}>Quality issue detected</span>
+                                    </p>
+                                    <button 
+                                        onClick={() => setShowFixModal(true)}
+                                        style={{
+                                            background: '#8b5cf6',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '8px 20px',
+                                            borderRadius: '8px',
+                                            fontSize: '13px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 4px 6px -1px rgba(139, 92, 246, 0.3)'
+                                        }}
+                                    >
+                                        Fix & Activate
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Success Overlay for Verified QR */}
+                            {!activeQr.upiId?.startsWith('MANUAL-UPI') && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '10px',
+                                    right: '10px',
+                                    background: '#10b981',
+                                    color: 'white',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '10px',
+                                    fontWeight: '900',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                    zIndex: 5
+                                }}>
+                                    {activeQr.imagePath ? 'VERIFIED ✓' : 'DIGITAL ✓'}
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ 
+                            marginTop: '20px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            padding: '6px 16px',
+                            background: '#f8fafc',
+                            borderRadius: '30px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ width: '8px', height: '8px', background: activeQr.upiId?.startsWith('MANUAL-UPI') ? '#f59e0b' : '#10b981', borderRadius: '50%' }}></div>
+                            <span style={{ fontSize: '11px', fontWeight: '800', color: '#475569', letterSpacing: '0.05em' }}>
+                                {activeQr.upiId?.startsWith('MANUAL-UPI') ? 'ACTION REQUIRED' : 'DIGITAL VERIFIED QR'}
+                            </span>
+                        </div>
+                      </>
                     ) : (
-                        <div className="qr-placeholder" style={{width: 280, height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5', color: '#666', borderRadius: '12px'}}>
+                        <div className="qr-placeholder" style={{width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5', color: '#666', borderRadius: '12px'}}>
                             No QR Assigned
                         </div>
                     )}
@@ -99,6 +215,79 @@ const QrCodesPage = () => {
                     </div>
                 )}
               </div>
+
+              {/* Fix Modal */}
+              {showFixModal && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        padding: '30px',
+                        borderRadius: '24px',
+                        width: '90%',
+                        maxWidth: '400px',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+                    }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>Fix Invalid QR</h2>
+                        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+                            Aapki photo thodi dhundli hai isliye system usey "read" nahi kar pa raha. Bas ek baar niche **UPI VPA** type karke save kar dijiye.
+                        </p>
+                        
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Merchant UPI VPA</label>
+                            <input 
+                                type="text"
+                                placeholder="example@paytm or 9123456789@upi"
+                                value={manualUpi}
+                                onChange={(e) => setManualUpi(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 16px',
+                                    borderRadius: '12px',
+                                    border: '2px solid #e2e8f0',
+                                    fontSize: '16px',
+                                    outline: 'none',
+                                    transition: 'border-color 0.2s'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button 
+                                onClick={() => setShowFixModal(false)}
+                                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#f1f5f9', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => updateUpiId(activeQr.id, manualUpi)}
+                                disabled={isFixing || !manualUpi.includes('@')}
+                                style={{ 
+                                    flex: 1, 
+                                    padding: '12px', 
+                                    borderRadius: '12px', 
+                                    border: 'none', 
+                                    background: '#8b5cf6', 
+                                    color: 'white', 
+                                    fontWeight: '600', 
+                                    cursor: 'pointer',
+                                    opacity: (isFixing || !manualUpi.includes('@')) ? 0.5 : 1
+                                }}
+                            >
+                                {isFixing ? 'Saving...' : 'Verify & Upgrade'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+              )}
             </>
           )}
 
@@ -161,16 +350,69 @@ const QrCodesPage = () => {
               {myQrs.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                   {myQrs.map(q => (
-                    <div key={q.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '1.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                        <div>
-                          <div style={{ fontWeight: '700', color: 'white', marginBottom: '0.25rem' }}>{q.label}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>TID: {q.tid || 'N/A'}</div>
+                    <div key={q.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ width: '48px', height: '48px', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)' }}>
+                                <img 
+                                    src={`http://localhost:4001${q.imagePath}`} 
+                                    alt="QR" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', transform: q.upiId?.startsWith('MANUAL-UPI') ? 'scale(2.5)' : 'none' }} 
+                                />
+                            </div>
+                            <div>
+                                <div style={{ fontWeight: '700', color: 'white', fontSize: '14px' }}>{q.label}</div>
+                                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>TID: {q.tid || 'N/A'}</div>
+                            </div>
                         </div>
-                        <span style={{ fontSize: '0.625rem', padding: '4px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontWeight: '800' }}>{q.status.toUpperCase()}</span>
+                        <span style={{ 
+                            fontSize: '10px', 
+                            padding: '4px 8px', 
+                            borderRadius: '4px', 
+                            background: q.upiId?.startsWith('MANUAL-UPI') ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                            color: q.upiId?.startsWith('MANUAL-UPI') ? '#f59e0b' : '#10b981', 
+                            fontWeight: '800' 
+                        }}>
+                            {q.upiId?.startsWith('MANUAL-UPI') ? 'ACTION REQ' : 'VERIFIED'}
+                        </span>
                       </div>
-                      <div style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+
+                      <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all', padding: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         {q.upiId}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                         {q.upiId?.startsWith('MANUAL-UPI') && (
+                            <button 
+                                onClick={() => {
+                                    setManualUpi('');
+                                    setShowFixModal(true);
+                                }}
+                                style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: '#8b5cf6', color: 'white', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                                Fix QR
+                            </button>
+                         )}
+                         <button 
+                            onClick={async () => {
+                                if (window.confirm("Release this QR code back to Admin? It will be removed from your dashboard.")) {
+                                    await unassignQrCode(q.id);
+                                }
+                            }}
+                            style={{ 
+                                flex: 1, 
+                                padding: '8px', 
+                                borderRadius: '8px', 
+                                border: '1px solid rgba(239, 68, 68, 0.3)', 
+                                background: 'rgba(239, 68, 68, 0.05)', 
+                                color: '#ef4444', 
+                                fontSize: '12px', 
+                                fontWeight: '700', 
+                                cursor: 'pointer' 
+                            }}
+                         >
+                            Unassign
+                         </button>
                       </div>
                     </div>
                   ))}

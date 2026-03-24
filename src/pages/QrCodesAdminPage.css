@@ -672,3 +672,31 @@
   box-shadow: 0 0 20px rgba(124, 108, 248, 0.15);
   transform: scale(1.01);
 }
+
+/* Batch Assign Bar — Added for selection interactivity */
+.batch-assign-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e1b4b;
+  border: 1px solid rgba(124,108,248,0.3);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  z-index: 1000;
+  min-width: 500px;
+}
+
+@keyframes slideUp {
+  from { transform: translate(-50%, 100%); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.animated-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+

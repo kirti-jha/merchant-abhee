@@ -37,7 +37,10 @@ const DashboardPage = () => {
   // Metrics Calculations
   const metrics = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
-    const todaysTxns = transactions.filter(t => t.date.startsWith(today));
+    const todaysTxns = transactions.filter(t => {
+      const d = t.date || t.createdAt;
+      return d && typeof d === 'string' && d.startsWith(today);
+    });
     
     return {
       todaysCount: todaysTxns.length,
@@ -213,7 +216,7 @@ const DashboardPage = () => {
                          {tx.type === 'debit' ? '-' : '+'}₹ {Math.abs(tx.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}
                       </td>
                       <td><span className={`status-badge ${tx.status.toLowerCase()}`}>{tx.status}</span></td>
-                      <td className="date-text" style={{fontSize: '12px'}}>{new Date(tx.date).toLocaleString()}</td>
+                      <td className="date-text" style={{fontSize: '12px'}}>{new Date(tx.date || tx.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}
                   {transactions.length === 0 && (

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../index";
 import { requireAuth, requireAdmin, AuthRequest } from "../middleware/auth";
+import { decodeWithAI } from "../utils/aiDecoder";
 import multer from "multer";
 import path from "path";
 
@@ -67,16 +68,16 @@ router.post("/", requireAuth, requireAdmin, upload.single("qrImage"), async (req
 // PATCH /api/qrcodes/:id — update QR code (admin only)
 router.patch("/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const { label, mid, tid, merchantName, merchantId, status } = req.body;
-  console.log(`PATCH QR ${id}:`, { label, mid, tid, merchantName, merchantId, status });
+  const { label, upiId, mid, tid, merchantName, merchantId, status } = req.body;
+  console.log(`PATCH QR ${id}:`, { label, upiId, mid, tid, merchantName, merchantId, status });
   try {
     const qr = await prisma.qrCode.update({
       where: { id },
-      data: { label, mid, tid, merchantName, merchantId, status },
+      data: { label, upiId, mid, tid, merchantName, merchantId, status },
     });
     res.json(qr);
   } catch (e: any) {
-    console.error(`PATCH QR ERROR:`, e.message);
+    console.error(`PATCH QR ERROR for ID ${id}:`, e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -165,15 +166,32 @@ router.post("/assign-by-tid", requireAuth, requireAdmin, async (req: AuthRequest
     if (!user) return res.status(404).json({ error: "Merchant not found" });
 
     // Search by TID OR by UPI ID (either could be the identifier)
-    const qrs = await prisma.qrCode.findMany({
-      where: { OR: [{ tid }, { upiId: tid }] }
+    // ONLY error if assigned to a DIFFERENT merchant
+    const alreadyAssignedToOthers = await prisma.qrCode.findMany({
+      where: { 
+        OR: [{ tid }, { upiId: tid }],
+        NOT: [
+            { merchantId: null },
+            { merchantId: merchantId }
+        ]
+      }
     });
 
-    if (qrs.length === 0) {
+    if (alreadyAssignedToOthers.length > 0) {
+      return res.status(400).json({ 
+        error: `Cannot assign: ${alreadyAssignedToOthers.length} QR code(s) found with this TID/UPI are already assigned to another merchant (${alreadyAssignedToOthers[0].merchantName}). Please unassign them first.` 
+      });
+    }
+
+    const availableQrs = await prisma.qrCode.findMany({
+        where: { OR: [{ tid }, { upiId: tid }] }
+    });
+
+    if (availableQrs.length === 0) {
       return res.status(404).json({ error: `No QR codes found with TID/UPI: ${tid}` });
     }
 
-    const idsToUpdate = qrs.map(q => q.id);
+    const idsToUpdate = availableQrs.map(q => q.id);
     const updated = await prisma.qrCode.updateMany({
       where: { id: { in: idsToUpdate } },
       data: {
@@ -194,7 +212,7 @@ router.post("/assign-by-tid", requireAuth, requireAdmin, async (req: AuthRequest
         });
     }
 
-    res.json({ success: true, count: updated.count, updatedKeys: qrs.map(q => q.upiId) });
+    res.json({ success: true, count: updated.count, updatedKeys: availableQrs.map(q => q.upiId) });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -214,6 +232,23 @@ router.post("/assign-by-ids", requireAuth, requireAdmin, async (req: AuthRequest
     });
 
     if (!user) return res.status(404).json({ error: "Merchant not found" });
+
+    // Check if any of these IDs are already assigned to DIFFERENT merchants
+    const alreadyAssignedToOthers = await prisma.qrCode.findMany({
+        where: { 
+            id: { in: ids },
+            AND: [
+                { NOT: { merchantId: null } },
+                { NOT: { merchantId: merchantId } }
+            ]
+        }
+    });
+
+    if (alreadyAssignedToOthers.length > 0) {
+        return res.status(400).json({ 
+            error: `${alreadyAssignedToOthers.length} QR code(s) are already assigned to other merchants. Please unassign them first.` 
+        });
+    }
 
     const updated = await prisma.qrCode.updateMany({
       where: { id: { in: ids } },
@@ -240,5 +275,34 @@ router.post("/assign-by-ids", requireAuth, requireAdmin, async (req: AuthRequest
     res.status(500).json({ error: e.message });
   }
 });
+
+// POST /api/qrcodes/:id/unassign — Unassign a QR code (admin or assigned merchant)
+router.post("/:id/unassign", requireAuth, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  try {
+    const roleRow = await prisma.userRole.findFirst({ where: { userId: req.userId! } });
+    const isAdmin = roleRow?.role === "admin";
+
+    const qr = await prisma.qrCode.findUnique({ where: { id } });
+    if (!qr) return res.status(404).json({ error: "QR Code not found" });
+
+    if (!isAdmin && qr.merchantId !== req.userId) {
+        return res.status(403).json({ error: "You are not authorized to unassign this QR code." });
+    }
+
+    const updated = await prisma.qrCode.update({
+      where: { id },
+      data: {
+        merchantId: null,
+        merchantName: "Unassigned",
+      },
+    });
+
+    res.json({ success: true, qr: updated });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 export default router;
