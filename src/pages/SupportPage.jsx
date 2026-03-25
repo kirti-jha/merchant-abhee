@@ -85,7 +85,7 @@ const SupportPage = () => {
                             <div className="ticket-list-container">
                                 {loading ? (
                                     <p>Loading tickets...</p>
-                                ) : tickets.length === 0 ? (
+                                ) : !Array.isArray(tickets) || tickets.length === 0 ? (
                                     <div className="empty-state">
                                         <p>No tickets found. Submit one on the right!</p>
                                     </div>

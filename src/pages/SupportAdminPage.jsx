@@ -83,7 +83,7 @@ const SupportAdminPage = () => {
                         <div className="tickets-table-container">
                             {loading ? (
                                 <p>Loading tickets...</p>
-                            ) : tickets.length === 0 ? (
+                            ) : !Array.isArray(tickets) || tickets.length === 0 ? (
                                 <p className="empty-state">No tickets to manage yet.</p>
                             ) : (
                                 <table className="admin-table">
