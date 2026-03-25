@@ -17,7 +17,11 @@ const SupportAdminPage = () => {
         fetchTickets();
     }, []);
 
+    const [error, setError] = useState(null);
+
     const fetchTickets = async () => {
+        setLoading(true);
+        setError(null);
         try {
             const token = sessionStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/support/tickets`, {
@@ -25,9 +29,11 @@ const SupportAdminPage = () => {
                 credentials: 'include'
             });
             const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to fetch tickets");
             setTickets(data);
         } catch (err) {
             console.error(err);
+            setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -83,6 +89,11 @@ const SupportAdminPage = () => {
                         <div className="tickets-table-container">
                             {loading ? (
                                 <p>Loading tickets...</p>
+                            ) : error ? (
+                                <div className="error-state" style={{color: '#ef4444', padding: '20px', background: 'rgba(239,68,68,0.1)', borderRadius: '12px'}}>
+                                    <strong>Error:</strong> {error}
+                                    <button onClick={fetchTickets} style={{marginLeft: '10px', background: '#ef4444', border: 'none', color: 'white', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer'}}>Retry</button>
+                                </div>
                             ) : !Array.isArray(tickets) || tickets.length === 0 ? (
                                 <p className="empty-state">No tickets to manage yet.</p>
                             ) : (

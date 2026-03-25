@@ -20,8 +20,10 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
     const secret = process.env.JWT_SECRET || "fallback_secret";
     const decoded = jwt.verify(token, secret) as any;
     req.userId = decoded.sub; 
+    console.log(`[Auth] User ID ${req.userId} verified from token.`);
     next();
   } catch (err) {
+    console.warn(`[Auth] Token verification failed: ${err.message}`);
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
