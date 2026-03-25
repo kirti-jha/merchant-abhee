@@ -80,11 +80,11 @@ router.get("/profile", requireAuth, async (req: AuthRequest, res) => {
 
 // PATCH /api/users/profile — update own profile
 router.patch("/profile", requireAuth, async (req: AuthRequest, res) => {
-  const { fullName, phone, businessName } = req.body;
+  const { fullName, phone, businessName, callbackUrl } = req.body;
   try {
     const profile = await prisma.profile.update({
       where: { userId: req.userId! },
-      data: { fullName, phone, businessName },
+      data: { fullName, phone, businessName, callbackUrl },
     });
     res.json(profile);
   } catch (e: any) {

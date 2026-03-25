@@ -4,6 +4,7 @@ import csv from "csv-parser";
 import fs from "fs";
 import { prisma } from "../index";
 import { requireAuth, requireAdmin, AuthRequest } from "../middleware/auth";
+import { triggerTransactionCallback } from "../utils/callback";
 
 const router = Router();
 const upload = multer({ dest: "uploads/" });
@@ -88,7 +89,7 @@ router.post("/upload", requireAuth, requireAdmin, upload.single("report"), async
             }
 
             // 3. Create transaction
-            await prisma.transaction.create({
+            const newTxn = await prisma.transaction.create({
               data: {
                 userId: merchantId,
                 serviceType: "qr_settlement",
@@ -105,6 +106,11 @@ router.post("/upload", requireAuth, requireAdmin, upload.single("report"), async
                 consumer: rawMobile.toString().trim() || null
               }
             });
+
+            // Trigger callback for SETTLED transactions
+            if (newTxn.status === "Completed" || newTxn.status === "success") {
+                triggerTransactionCallback(newTxn.id).catch(e => console.error("Callback trigger failed:", e));
+            }
 
             processedCount++;
           } catch (err) {

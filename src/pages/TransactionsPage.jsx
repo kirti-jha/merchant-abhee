@@ -8,6 +8,24 @@ const TransactionsPage = () => {
   const { transactions } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [resendingId, setResendingId] = useState(null);
+
+  const handleRetryCallback = async (txnId) => {
+    setResendingId(txnId);
+    try {
+      const res = await fetch(`http://localhost:4001/api/callback-logs/resend/${txnId}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error("Retry failed");
+      alert("Callback re-triggered successfully!");
+    } catch (err) {
+      console.error("Callback retry failed:", err);
+      alert("Failed to re-trigger callback.");
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const filteredTransactions = useMemo(() => {
     return (transactions || []).filter(tx => {
@@ -88,6 +106,7 @@ const TransactionsPage = () => {
                     <th>Type</th>
                     <th>Amount</th>
                     <th>Status</th>
+                    <th>Callback</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -106,6 +125,15 @@ const TransactionsPage = () => {
                         <span className={`status-badge ${(tx.status || 'Pending').toLowerCase()}`}>
                           {tx.status || 'Pending'}
                         </span>
+                      </td>
+                      <td>
+                        <button 
+                          className="txn-retry-btn"
+                          disabled={resendingId === tx.id}
+                          onClick={() => handleRetryCallback(tx.id)}
+                        >
+                          {resendingId === tx.id ? '...' : '↪'}
+                        </button>
                       </td>
                     </tr>
                   ))}

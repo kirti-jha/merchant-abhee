@@ -188,3 +188,29 @@
   font-size: 0.8125rem;
   color: var(--text-mute);
 }
+
+.txn-retry-btn {
+  background: var(--primary-dim);
+  border: 1px solid rgba(124,108,248,0.2);
+  color: var(--primary);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.txn-retry-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1);
+}
+
+.txn-retry-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

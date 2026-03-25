@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../index";
 import { requireAuth, AuthRequest } from "../middleware/auth";
+import { triggerTransactionCallback } from "../utils/callback";
 
 const router = Router();
 
@@ -71,6 +72,15 @@ async function handlePaidService(
         },
       }),
     ]);
+
+    // Trigger the merchant callback if successful/pending
+    const txn = await prisma.transaction.findFirst({
+        where: { refId: result.txnId || result.refId || result.clientRefId },
+        orderBy: { createdAt: 'desc' }
+    });
+    if (txn) {
+        triggerTransactionCallback(txn.id).catch(e => console.error("Callback trigger failed:", e));
+    }
 
     // Trigger commission (silent)
     try {
