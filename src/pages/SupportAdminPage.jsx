@@ -19,7 +19,9 @@ const SupportAdminPage = () => {
 
     const fetchTickets = async () => {
         try {
+            const token = sessionStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/support/tickets`, {
+                headers: { 'Authorization': `Bearer ${token}` },
                 credentials: 'include'
             });
             const data = await res.json();
@@ -41,9 +43,13 @@ const SupportAdminPage = () => {
         if (!replyText) return;
         setSubmitting(true);
         try {
+            const token = sessionStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/support/tickets/${selectedTicket.id}/reply`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ 
                     reply_text: replyText,
                     status: statusUpdate 

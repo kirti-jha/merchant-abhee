@@ -22,9 +22,16 @@ const CallbacksPage = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
+            const token = sessionStorage.getItem('authToken');
             const [profileRes, logsRes] = await Promise.all([
-                fetch(`${API_BASE}/auth/profile`, { credentials: 'include' }).then(r => r.json()),
-                fetch(`${API_BASE}/callback-logs`, { credentials: 'include' }).then(r => r.json())
+                fetch(`${API_BASE}/auth/profile`, { 
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    credentials: 'include' 
+                }).then(r => r.json()),
+                fetch(`${API_BASE}/callback-logs`, { 
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    credentials: 'include' 
+                }).then(r => r.json())
             ]);
             setCallbackUrl(profileRes.callbackUrl || '');
             setLogs(logsRes || []);
@@ -43,9 +50,13 @@ const CallbacksPage = () => {
         }
         setSaving(true);
         try {
+            const token = sessionStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/users/profile`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ callbackUrl }),
                 credentials: 'include'
             });
@@ -61,8 +72,10 @@ const CallbacksPage = () => {
 
     const handleResend = async (txnId) => {
         try {
+            const token = sessionStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/callback-logs/resend/${txnId}`, {
                 method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
                 credentials: 'include'
             });
             if (!res.ok) throw new Error("Resend failed");

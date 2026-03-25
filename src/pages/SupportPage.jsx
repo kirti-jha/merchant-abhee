@@ -25,7 +25,9 @@ const SupportPage = () => {
 
     const fetchTickets = async () => {
         try {
+            const token = sessionStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/support/tickets`, {
+                headers: { 'Authorization': `Bearer ${token}` },
                 credentials: 'include'
             });
             if (!res.ok) throw new Error("Failed to fetch tickets");
@@ -44,9 +46,13 @@ const SupportPage = () => {
         setStatusMsg({ type: '', text: '' });
 
         try {
+            const token = sessionStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/support/tickets`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(formData),
                 credentials: 'include'
             });

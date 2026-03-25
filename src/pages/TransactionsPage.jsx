@@ -13,8 +13,10 @@ const TransactionsPage = () => {
   const handleRetryCallback = async (txnId) => {
     setResendingId(txnId);
     try {
+      const token = sessionStorage.getItem('authToken');
       const res = await fetch(`http://localhost:4001/api/callback-logs/resend/${txnId}`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
       if (!res.ok) throw new Error("Retry failed");
