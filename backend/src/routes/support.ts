@@ -13,6 +13,19 @@ router.get("/tickets", requireAuth, async (req: AuthRequest, res) => {
     const where = isAdmin ? {} : { userId: req.userId! };
     const tickets = await prisma.supportTicket.findMany({
       where,
+      include: {
+        user: {
+          select: {
+            email: true,
+            profile: {
+              select: {
+                fullName: true,
+                businessName: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
 

@@ -17,6 +17,8 @@ import FundRequestsAdminPage from './pages/FundRequestsAdminPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import MerchantSettingsPage from './pages/MerchantSettingsPage';
 import CallbacksPage from './pages/CallbacksPage';
+import SupportPage from './pages/SupportPage';
+import SupportAdminPage from './pages/SupportAdminPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
@@ -40,6 +42,7 @@ function App() {
           <Route path="/wallet" element={<ProtectedRoute requiredRole="merchant"><WalletPage /></ProtectedRoute>} />
           <Route path="/api-services" element={<ProtectedRoute requiredRole="merchant"><ApiServicesPage /></ProtectedRoute>} />
           <Route path="/callbacks" element={<ProtectedRoute requiredRole="merchant"><CallbacksPage /></ProtectedRoute>} />
+          <Route path="/support" element={<ProtectedRoute requiredRole="merchant"><SupportPage /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute requiredRole="merchant"><MerchantSettingsPage /></ProtectedRoute>} />
 
           {/* Admin Protected Routes */}
@@ -52,6 +55,7 @@ function App() {
           <Route path="/admin/fund-requests" element={<ProtectedRoute requiredRole="admin"><FundRequestsAdminPage /></ProtectedRoute>} />
           <Route path="/admin/qr-codes" element={<ProtectedRoute requiredRole="admin"><QrCodesAdminPage /></ProtectedRoute>} />
           <Route path="/admin/callbacks" element={<ProtectedRoute requiredRole="admin"><CallbacksPage /></ProtectedRoute>} />
+          <Route path="/admin/support" element={<ProtectedRoute requiredRole="admin"><SupportAdminPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettingsPage /></ProtectedRoute>} />
           
           {/* Redirects */}

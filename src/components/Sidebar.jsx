@@ -20,6 +20,7 @@ const Sidebar = () => {
     { name: 'QR Codes', icon: '🔳', path: '/qr-codes' },
     { name: 'Wallet', icon: '💳', path: '/wallet' },
     { name: 'Callbacks', icon: '⚡', path: '/callbacks' },
+    { name: 'Support', icon: '🎧', path: '/support' },
     { name: 'Settings', icon: '⚙️', path: '/settings' },
   ];
 
@@ -32,6 +33,7 @@ const Sidebar = () => {
     { name: 'QR Codes', icon: '🔳', path: '/admin/qr-codes' },
     { name: 'Settlements', icon: '💸', path: '/admin/settlements' },
     { name: 'Callbacks', icon: '⚡', path: '/admin/callbacks' },
+    { name: 'Support', icon: '🎧', path: '/admin/support' },
     { name: 'Settings', icon: '⚙️', path: '/admin/settings' },
   ];
 
