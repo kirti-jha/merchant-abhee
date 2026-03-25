@@ -123,7 +123,7 @@ const SupportPage = () => {
                         <aside className="support-card">
                             <h2>Submit New Ticket</h2>
                             <form className="support-form" onSubmit={handleSubmit}>
-                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px'}}>
+                                <div className="form-row">
                                     <div className="form-group">
                                         <label>Category</label>
                                         <select 
@@ -161,7 +161,7 @@ const SupportPage = () => {
                                     {submitting ? 'Submitting...' : 'Send Message'}
                                 </button>
                                 {statusMsg.text && (
-                                    <div className={`status-msg ${statusMsg.type}`} style={{marginTop: '10px', fontSize: '13px', color: statusMsg.type === 'success' ? '#10b981' : '#ef4444'}}>
+                                    <div className={`status-msg ${statusMsg.type}`}>
                                         {statusMsg.text}
                                     </div>
                                 )}
