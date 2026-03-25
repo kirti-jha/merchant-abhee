@@ -117,27 +117,29 @@ const SupportPage = () => {
                         <aside className="support-card">
                             <h2>Submit New Ticket</h2>
                             <form className="support-form" onSubmit={handleSubmit}>
-                                <div className="form-group">
-                                    <label>Category</label>
-                                    <select 
-                                        value={formData.category}
-                                        onChange={(e) => setFormData({...formData, category: e.target.value})}
-                                    >
-                                        <option value="general">General Inquiry</option>
-                                        <option value="technical">Technical Issue</option>
-                                        <option value="billing">Billing/Wallet</option>
-                                        <option value="kyc">KYC Related</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Subject</label>
-                                    <input 
-                                        type="text" 
-                                        required
-                                        placeholder="Brief summary of the issue"
-                                        value={formData.subject}
-                                        onChange={(e) => setFormData({...formData, subject: e.target.value})}
-                                    />
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px'}}>
+                                    <div className="form-group">
+                                        <label>Category</label>
+                                        <select 
+                                            value={formData.category}
+                                            onChange={(e) => setFormData({...formData, category: e.target.value})}
+                                        >
+                                            <option value="general">General Inquiry</option>
+                                            <option value="technical">Technical Issue</option>
+                                            <option value="billing">Billing/Wallet</option>
+                                            <option value="kyc">KYC Related</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Subject</label>
+                                        <input 
+                                            type="text" 
+                                            required
+                                            placeholder="Brief summary"
+                                            value={formData.subject}
+                                            onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="form-group">
                                     <label>Message</label>
@@ -146,13 +148,14 @@ const SupportPage = () => {
                                         placeholder="Describe your issue in detail..."
                                         value={formData.message}
                                         onChange={(e) => setFormData({...formData, message: e.target.value})}
+                                        style={{minHeight: '150px'}}
                                     />
                                 </div>
                                 <button type="submit" className="btn-primary-support" disabled={submitting}>
                                     {submitting ? 'Submitting...' : 'Send Message'}
                                 </button>
                                 {statusMsg.text && (
-                                    <div className={`status-msg ${statusMsg.type}`} style={{marginTop: '10px', fontSize: '13px'}}>
+                                    <div className={`status-msg ${statusMsg.type}`} style={{marginTop: '10px', fontSize: '13px', color: statusMsg.type === 'success' ? '#10b981' : '#ef4444'}}>
                                         {statusMsg.text}
                                     </div>
                                 )}

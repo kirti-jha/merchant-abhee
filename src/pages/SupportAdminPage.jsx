@@ -123,12 +123,12 @@ const SupportAdminPage = () => {
 
                     {selectedTicket && (
                         <div className="reply-modal-overlay">
-                            <div className="reply-modal">
-                                <h3>Manage Support Ticket</h3>
+                            <div className="reply-modal" style={{background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)'}}>
+                                <h3 style={{color: '#ffffff'}}>Manage Support Ticket</h3>
                                 
-                                <div className="ticket-context">
-                                    <strong>Merchant Message:</strong>
-                                    <p>{selectedTicket.message}</p>
+                                <div className="ticket-context" style={{background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)'}}>
+                                    <strong style={{color: '#94a3b8'}}>Merchant Message</strong>
+                                    <p style={{color: '#cbd5e1'}}>{selectedTicket.message}</p>
                                 </div>
 
                                 <div className="support-form">
@@ -156,8 +156,8 @@ const SupportAdminPage = () => {
                                 </div>
 
                                 <div className="modal-actions">
-                                    <button className="action-btn btn-cancel" onClick={() => setSelectedTicket(null)}>Discard</button>
-                                    <button className="action-btn btn-primary-support" style={{width: 'auto', padding: '10px 24px'}} onClick={handleReply} disabled={submitting}>
+                                    <button className="action-btn btn-cancel" style={{background: '#334155', color: '#f1f5f9'}} onClick={() => setSelectedTicket(null)}>Discard</button>
+                                    <button className="action-btn btn-primary-support" style={{width: 'auto', padding: '10px 24px', margin: 0}} onClick={handleReply} disabled={submitting}>
                                         {submitting ? 'Saving...' : 'Send Reply'}
                                     </button>
                                 </div>
