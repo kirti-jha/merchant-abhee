@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
-const API_BASE = 'http://localhost:4001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000/api';
+
+
+
 
 // Synchronous intercept to prevent React Router redirect race condition!
 if (typeof window !== 'undefined') {

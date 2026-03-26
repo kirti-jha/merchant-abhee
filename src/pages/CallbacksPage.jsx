@@ -13,7 +13,8 @@ const CallbacksPage = () => {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
 
-    const API_BASE = 'http://localhost:4001/api';
+    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000/api';
+
 
     useEffect(() => {
         fetchData();
