@@ -23,7 +23,8 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
     console.log(`[Auth] User ID ${req.userId} verified from token.`);
     next();
   } catch (err) {
-    console.warn(`[Auth] Token verification failed: ${err.message}`);
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[Auth] Token verification failed: ${message}`);
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
