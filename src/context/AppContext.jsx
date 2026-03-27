@@ -13,6 +13,8 @@ export const AppProvider = ({ children }) => {
     const [fundRequests, setFundRequests] = useState([]); // For Admin Add Money
     const [transactions, setTransactions] = useState([]); // Service Transactions
     const [walletHistory, setWalletHistory] = useState([]); // Wallet Movement History
+    const [reports, setReports] = useState([]);
+    const [mappingTrace, setMappingTrace] = useState([]);
     const [loading, setLoading] = useState(true);
     const { isAuthenticated, user } = useAuth();
 
@@ -29,7 +31,7 @@ export const AppProvider = ({ children }) => {
         if (!token) return;
 
         try {
-            const [walletRes, merchantsRes, qrRes, txnsRes] = await Promise.all([
+            const results = await Promise.allSettled([
                 fetch(`${API_BASE}/wallet`, { headers: getHeaders() }),
                 fetch(`${API_BASE}/users`, { headers: getHeaders() }),
                 fetch(`${API_BASE}/qrcodes`, { headers: getHeaders() }),
@@ -37,32 +39,33 @@ export const AppProvider = ({ children }) => {
                 fetch(`${API_BASE}/wallet/transactions`, { headers: getHeaders() })
             ]);
 
-            if (walletRes.ok) {
-                const data = await walletRes.json();
+            // Process each result independently
+            if (results[0].status === 'fulfilled' && results[0].value.ok) {
+                const data = await results[0].value.json();
                 setWallet(data || { balance: 0, eWalletBalance: 0 });
             }
-            if (merchantsRes.ok) {
-                const data = await merchantsRes.json();
+
+            if (results[1].status === 'fulfilled' && results[1].value.ok) {
+                const data = await results[1].value.json();
                 if (Array.isArray(data)) setMerchants(data);
             }
-            if (qrRes.ok) {
-                const data = await qrRes.json();
+
+            if (results[2].status === 'fulfilled' && results[2].value.ok) {
+                const data = await results[2].value.json();
                 if (Array.isArray(data)) setQrCodes(data);
             }
-            if (txnsRes.ok) {
-                const data = await txnsRes.json();
+
+            if (results[3].status === 'fulfilled' && results[3].value.ok) {
+                const data = await results[3].value.json();
                 if (Array.isArray(data)) setTransactions(data);
             }
-            // wallet history is the 5th element in Promise.all now
-            const historyRes = await Promise.allSettled([
-                fetch(`${API_BASE}/wallet/transactions`, { headers: getHeaders() })
-            ]);
-            if (historyRes[0].status === 'fulfilled' && historyRes[0].value.ok) {
-                const data = await historyRes[0].value.json();
+
+            if (results[4].status === 'fulfilled' && results[4].value.ok) {
+                const data = await results[4].value.json();
                 if (Array.isArray(data)) setWalletHistory(data);
             }
 
-            // Fetch Bank Accounts for Merchant
+            // Fetch Bank Accounts for Merchant separately
             const bankRes = await fetch(`${API_BASE}/bank-accounts`, { headers: getHeaders() });
             if (bankRes.ok) {
                 const data = await bankRes.json();
@@ -131,6 +134,46 @@ export const AppProvider = ({ children }) => {
             console.error("Fetch fund requests failed", err);
         }
     };
+
+    const fetchReports = useCallback(async ({ limit = 100, status } = {}) => {
+        try {
+            const params = new URLSearchParams();
+            if (limit) params.set("limit", limit.toString());
+            if (status) params.set("status", status);
+            const queryString = params.toString() ? `?${params.toString()}` : "";
+            const res = await fetch(`${API_BASE}/reports${queryString}`, {
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setReports(data.transactions || []);
+                return data;
+            }
+            console.error("Fetch reports failed:", await res.text());
+        } catch (err) {
+            console.error("Fetch reports failed", err);
+        }
+        setReports([]);
+        return { transactions: [], stats: { totalCount: 0, totalVolume: 0, statusCounts: {} } };
+    }, [getHeaders]);
+
+    const fetchMappingTrace = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/reports/mapping-trace`, {
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setMappingTrace(Array.isArray(data.entries) ? data.entries : []);
+                return data.entries || [];
+            }
+            console.error("Fetch mapping trace failed:", await res.text());
+        } catch (err) {
+            console.error("Fetch mapping trace failed", err);
+        }
+        setMappingTrace([]);
+        return [];
+    }, [getHeaders]);
 
     const approveFundRequest = async (id) => {
         try {
@@ -439,6 +482,7 @@ export const AppProvider = ({ children }) => {
             const data = await res.json();
             if (res.ok) {
                 await fetchData();
+                await fetchReports();
                 return { success: true, data };
             }
             return { success: false, error: data.error };
@@ -488,6 +532,10 @@ export const AppProvider = ({ children }) => {
             updateQrCode,
             deleteQrCode,
             uploadReport,
+            reports,
+            fetchReports,
+            mappingTrace,
+            fetchMappingTrace,
             generateApiKey,
             getSystemSetting,
             fetchData

@@ -76,7 +76,11 @@ const SupportPage = () => {
                 <Header />
                 <div className="support-container">
                     <header className="support-header">
-                        <h1>Contact Support</h1>
+                        <div className="support-header-icon">🎫</div>
+                        <div>
+                            <h1>Contact Support</h1>
+                            <p>Get help from our team — we respond within 24 hours</p>
+                        </div>
                     </header>
 
                     <div className="support-grid">

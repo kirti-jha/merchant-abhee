@@ -107,6 +107,7 @@ const TransactionsPage = () => {
                     <th>Mobile</th>
                     <th>Type</th>
                     <th>Amount</th>
+                    <th>Done By</th>
                     <th>Status</th>
                     <th>Callback</th>
                   </tr>
@@ -123,6 +124,7 @@ const TransactionsPage = () => {
                       <td className={`txn-amount-cell ${(tx.type || '').toLowerCase() === 'credit' ? 'txn-amount-credit' : 'txn-amount-debit'}`}>
                         {tx.type === 'debit' || Number(tx.amount) < 0 ? '-' : '+'}₹ {Math.abs(Number(tx.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}
                       </td>
+                      <td>{tx.sender || '—'}</td>
                       <td>
                         <span className={`status-badge ${(tx.status || 'Pending').toLowerCase()}`}>
                           {tx.status || 'Pending'}
