@@ -34,7 +34,8 @@ const Header = ({ title }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadNotifications = notifications.filter(n => !n.isRead);
+  const unreadCount = unreadNotifications.length;
 
   const handleSettingsClick = () => {
     navigate(isAdmin ? '/admin/settings' : '/settings');
@@ -48,7 +49,23 @@ const Header = ({ title }) => {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         setNotifications(notifications.map(n => n.id === id ? { ...n, isRead: true } : n));
+        return true;
     } catch (e) {}
+    return false;
+  };
+
+  const clearNotifications = async (event) => {
+    event.stopPropagation();
+    try {
+        const token = sessionStorage.getItem('authToken');
+        await fetch('http://localhost:4001/api/notifications/read-all', {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setNotifications([]);
+    } catch (err) {
+        console.error("Failed to clear notifications", err);
+    }
   };
 
   const displayName = user?.name || (isAdmin ? 'Admin' : 'User');
@@ -88,15 +105,38 @@ const Header = ({ title }) => {
             }}>
               <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h4 style={{ margin: 0 }}>Notifications</h4>
-                <span style={{ fontSize: '11px', color: 'var(--text-mute)' }}>{notifications.length} recent</span>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-mute)' }}>{notifications.length} recent</span>
+                  <button 
+                    style={{ 
+                      fontSize: '11px', 
+                      color: 'var(--accent)', 
+                      background: 'transparent', 
+                      border: 'none', 
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                    onClick={clearNotifications}
+                  >
+                    Clear all
+                  </button>
+                </div>
               </div>
-              {notifications.length === 0 ? (
+              {unreadNotifications.length === 0 ? (
                 <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-mute)' }}>No notifications</div>
               ) : (
-                notifications.map(n => (
+                unreadNotifications.map(n => (
                   <div 
                     key={n.id} 
-                    onClick={() => markRead(n.id)}
+                    onClick={async (event) => {
+                      event.stopPropagation();
+                      const marked = await markRead(n.id);
+                      const targetLink = n.link || n.redirect || n.path || n.route;
+                      if (targetLink) {
+                        navigate(targetLink);
+                      }
+                      if (marked) setShowNotifMenu(false);
+                    }}
                     style={{ 
                       padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
                       background: n.isRead ? 'transparent' : 'rgba(124,108,248,0.05)'
@@ -126,4 +166,3 @@ const Header = ({ title }) => {
 };
 
 export default Header;
-

@@ -231,3 +231,49 @@ input, select, textarea { font-family: inherit; }
   0%, 100% { box-shadow: 0 0 8px rgba(124,108,248,0.3); }
   50%       { box-shadow: 0 0 24px rgba(124,108,248,0.6); }
 }
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 220px;
+  }
+  .main-content {
+    margin-left: 220px;
+  }
+}
+
+@media (max-width: 940px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+  .sidebar {
+    position: relative;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .main-content {
+    margin-left: 0;
+  }
+  .dashboard-body {
+    padding: 1.5rem 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar-nav {
+    gap: 1px;
+  }
+  .nav-item {
+    gap: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.78rem;
+  }
+  .dashboard-body {
+    padding: 1rem;
+  }
+  .card {
+    border-radius: 12px;
+  }
+}

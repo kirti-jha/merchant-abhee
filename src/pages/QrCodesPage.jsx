@@ -11,10 +11,12 @@ const QrCodesPage = () => {
   const { qrCodes, updateQrCode, unassignQrCode } = useAppContext();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('My QR');
+  const [viewMode, setViewMode] = useState('physical'); // default: show original uploaded image
   const [dynamicAmount, setDynamicAmount] = useState('');
   const [fixingQr, setFixingQr] = useState(null); // Tracks the specific QR being fixed
   const [manualUpi, setManualUpi] = useState('');
   const [isFixing, setIsFixing] = useState(false);
+  const [selectedQrId, setSelectedQrId] = useState(null); // Explicit selection state
 
   const updateUpiId = async (id, upiId) => {
     setIsFixing(true);
@@ -36,31 +38,88 @@ const QrCodesPage = () => {
     return (qrCodes || []).filter(q => q.merchantId === user?.id && q.status === 'active');
   }, [qrCodes, user]);
 
-  // Rotate: Pick one random QR from the assigned set
-  // PREFERENCE: Prioritize QRs that are NOT MANUAL placeholders
+  // Calculate Active QR based on selection or fallback
   const activeQr = useMemo(() => {
     if (myQrs.length === 0) return null;
     
-    const verifiedQrs = myQrs.filter(q => !q.upiId?.startsWith('MANUAL-UPI'));
-    const sourceList = verifiedQrs.length > 0 ? verifiedQrs : myQrs;
+    // 1. Check if we have an explicit selection
+    if (selectedQrId) {
+        const found = myQrs.find(q => q.id === selectedQrId);
+        if (found) return found;
+    }
+
+    // 2. Fallback: Prioritize QRs that are NOT MANUAL placeholders
+    const sortedQrs = [...myQrs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const verifiedQrs = sortedQrs.filter(q => {
+        const upi = (q.upiId || "").trim();
+        return upi && !upi.startsWith('MANUAL-UPI');
+    });
     
-    const randomIndex = Math.floor(Math.random() * sourceList.length);
-    return sourceList[randomIndex];
-  }, [myQrs]);
+    return verifiedQrs.length > 0 ? verifiedQrs[0] : sortedQrs[0];
+  }, [myQrs, selectedQrId]);
 
   // Calculate UPI String based on tab
   const getUpiString = (amount = 0) => {
     if (!activeQr) return "upi://pay?pa=unassigned@upi&pn=Unassigned&mc=0000&tid=&tr=&tn=Unassigned&am=0&cu=INR";
     
-    // tr is the transaction reference, used to track this specific QR instance
-    return `upi://pay?pa=${activeQr.upiId}&pn=${encodeURIComponent(user?.name || 'Merchant')}&mc=0000&tid=${activeQr.tid || ''}&tr=${activeQr.id}&tn=Payment%20to%20Telering&am=${amount}&cu=INR`;
+    const rawVal = activeQr.upiId || "";
+
+    // 1. If it's BHARAT-QR / EMV Co (common for bank merchant stands)
+    // Starts with 000201...
+    if (rawVal.startsWith('000201')) {
+        return rawVal;
+    }
+
+    // 2. If it's already a full UPI URI
+    if (rawVal.startsWith('upi://')) {
+        // If we have an amount > 0, we could try to append &am=
+        // but for "exact QR" request, better to respect original if possible
+        if (amount > 0 && !rawVal.includes('&am=')) {
+            return `${rawVal}&am=${amount}`;
+        }
+        return rawVal;
+    }
+    
+    // 3. Otherwise, treat as simple VPA and build the URI
+    const pa = rawVal;
+    const pn = encodeURIComponent(user?.name || 'Merchant');
+    const mc = '0000'; // Default merchant category
+    const tid = activeQr.tid || '';
+    const tr = activeQr.id;
+    const tn = encodeURIComponent(`Payment to ${user?.name || 'Telering'}`);
+    
+    let upi = `upi://pay?pa=${pa}&pn=${pn}&mc=${mc}&tr=${tr}&tn=${tn}&cu=INR`;
+    
+    if (amount > 0) {
+      upi += `&am=${amount}`;
+    }
+    
+    if (tid) {
+      upi += `&tid=${tid}`;
+    }
+    
+    return upi;
   };
 
+  const [showPreview, setShowPreview] = useState(false);
   const upiString = getUpiString();
   const dynamicUpiString = getUpiString(Number(dynamicAmount) || 0);
 
   return (
     <div className="dashboard-layout">
+      {showPreview && activeQr?.imagePath && (
+        <div className="fullscreen-modal" onClick={() => setShowPreview(false)}>
+            <div className="modal-content large-preview" onClick={e => e.stopPropagation()}>
+                <button className="close-modal" onClick={() => setShowPreview(false)}>×</button>
+                <div className="preview-label">Original Uploaded QR Image</div>
+                <img 
+                    src={`http://localhost:4001${activeQr.imagePath}`} 
+                    alt="Original QR" 
+                    className="full-image"
+                />
+            </div>
+        </div>
+      )}
       <Sidebar />
       <div className="main-content">
         <Header />
@@ -78,9 +137,26 @@ const QrCodesPage = () => {
                 <h2>Your Payment QR Code</h2>
                 <p className="subtitle">
                     {activeQr 
-                        ? `Showing ${activeQr.label} (Rotating between ${myQrs.length} QRs)` 
+                        ? `Showing ${activeQr.label}${myQrs.length > 1 ? ` (1 of ${myQrs.length} assigned)` : ''}` 
                         : "Wait for admin to assign QR codes to your account."}
                 </p>
+                {activeQr?.upiId?.startsWith('MANUAL-UPI') && (
+                    <div className="manual-qr-warning" style={{ 
+                        marginTop: '12px', 
+                        padding: '12px', 
+                        background: 'rgba(245, 158, 11, 0.1)', 
+                        border: '1px solid rgba(245, 158, 11, 0.2)', 
+                        borderRadius: '12px',
+                        color: '#fbbf24',
+                        fontSize: '12px',
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center'
+                    }}>
+                        <span>⚠️</span>
+                        <span>This QR requires manual verification. Please use the "Physical" view for scanning.</span>
+                    </div>
+                )}
               </div>
 
               <div className="qr-card-exact card">
@@ -91,6 +167,18 @@ const QrCodesPage = () => {
                        <span>{activeQr?.mid || user?.partnerId || 'MERCHANT_ID'}</span>
                        <button className="copy-btn">📋</button>
                     </div>
+                    {activeQr?.imagePath && (
+                      <div className="view-mode-toggle">
+                        <button 
+                          className={viewMode === 'digital' ? 'active' : ''} 
+                          onClick={() => setViewMode('digital')}
+                        >Digital</button>
+                        <button 
+                          className={viewMode === 'physical' ? 'active' : ''} 
+                          onClick={() => setViewMode('physical')}
+                        >Physical</button>
+                      </div>
+                    )}
                 </div>
                 
                 <div className="qr-code-body">
@@ -107,25 +195,31 @@ const QrCodesPage = () => {
                   }}>
                     {activeQr ? (
                       <>
-                        <div style={{ position: 'relative', width: '220px', height: '220px', overflow: 'hidden', borderRadius: '12px', background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {activeQr.imagePath ? (
-                                <img 
-                                    src={`http://localhost:4001${activeQr.imagePath}`} 
-                                    alt="Merchant QR" 
-                                    style={{ 
-                                        width: '100%', 
-                                        height: '100%', 
-                                        objectFit: (activeQr.upiId?.startsWith('MANUAL-UPI') || activeQr.type === 'bulk') ? 'cover' : 'contain',
-                                        transform: (activeQr.upiId?.startsWith('MANUAL-UPI') || activeQr.type === 'bulk') ? 'scale(1.8)' : 'none',
-                                        filter: 'contrast(1.1) brightness(1.02)'
-                                    }} 
-                                />
+                        <div style={{ position: 'relative', width: '280px', height: '280px', overflow: 'hidden', borderRadius: '12px', background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {(viewMode === 'physical' && activeQr.imagePath) ? (
+                                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                    <img 
+                                        src={`http://localhost:4001${activeQr.imagePath}`} 
+                                        alt="Merchant QR" 
+                                        style={{ 
+                                            width: '100%', 
+                                            height: '100%', 
+                                            objectFit: 'contain',
+                                            filter: 'contrast(1.1) brightness(1.02)'
+                                        }} 
+                                    />
+                                    <button 
+                                        className="zoom-overlay-btn"
+                                        onClick={() => setShowPreview(true)}
+                                        title="View Full Photo"
+                                    >🔍</button>
+                                </div>
                             ) : (
-                                <QRCodeSVG 
+                                 <QRCodeSVG 
                                     value={upiString} 
-                                    size={200}
+                                    size={256}
                                     level="H"
-                                    includeMargin={false}
+                                    includeMargin={true}
                                 />
                             )}
 
@@ -189,17 +283,41 @@ const QrCodesPage = () => {
                         <div style={{ 
                             marginTop: '20px', 
                             display: 'flex', 
+                            flexDirection: 'column',
                             alignItems: 'center', 
-                            gap: '8px',
-                            padding: '6px 16px',
-                            background: '#f8fafc',
-                            borderRadius: '30px',
-                            border: '1px solid #e2e8f0'
+                            gap: '12px',
+                            width: '100%'
                         }}>
-                            <div style={{ width: '8px', height: '8px', background: activeQr.upiId?.startsWith('MANUAL-UPI') ? '#f59e0b' : '#10b981', borderRadius: '50%' }}></div>
-                            <span style={{ fontSize: '11px', fontWeight: '800', color: '#475569', letterSpacing: '0.05em' }}>
-                                {activeQr.upiId?.startsWith('MANUAL-UPI') ? 'ACTION REQUIRED' : 'DIGITAL VERIFIED QR'}
-                            </span>
+                            <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                padding: '6px 16px',
+                                background: '#f8fafc',
+                                borderRadius: '30px',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                <div style={{ width: '8px', height: '8px', background: activeQr.upiId?.startsWith('MANUAL-UPI') ? '#f59e0b' : '#10b981', borderRadius: '50%' }}></div>
+                                <span style={{ fontSize: '11px', fontWeight: '800', color: '#475569', letterSpacing: '0.05em' }}>
+                                    {activeQr.upiId?.startsWith('000201') ? 'RAW BHARAT-QR DATA' : (activeQr.upiId?.startsWith('upi://') ? 'ORIGINAL UPI URI' : 'DIGITAL VERIFIED QR')}
+                                </span>
+                            </div>
+
+                            <div className="raw-data-box" style={{ 
+                                width: '100%',
+                                padding: '12px',
+                                background: '#f1f5f9',
+                                borderRadius: '12px',
+                                fontSize: '10px',
+                                color: '#64748b',
+                                fontFamily: 'monospace',
+                                wordBreak: 'break-all',
+                                textAlign: 'center',
+                                border: '1px dashed #cbd5e1'
+                            }}>
+                                <div style={{ fontWeight: '700', marginBottom: '4px', color: '#475569' }}>ENC DATA:</div>
+                                {activeQr.upiId}
+                            </div>
                         </div>
                       </>
                     ) : (
@@ -322,7 +440,7 @@ const QrCodesPage = () => {
                   <div className="qr-frame" style={{ background: 'white', padding: '1rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
                     <QRCodeSVG 
                         value={dynamicUpiString} 
-                        size={240}
+                        size={280}
                         level="H"
                         includeMargin={true}
                     />
@@ -354,7 +472,29 @@ const QrCodesPage = () => {
               {myQrs.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                   {myQrs.map(q => (
-                    <div key={q.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div 
+                      key={q.id} 
+                      onClick={() => {
+                        setSelectedQrId(q.id);
+                        setActiveTab('My QR');
+                        // If it's a manual QR, switch to physical mode automatically
+                        if (q.upiId?.startsWith('MANUAL-UPI')) setViewMode('physical');
+                      }}
+                      style={{ 
+                        background: q.id === activeQr?.id ? 'rgba(124, 58, 237, 0.1)' : 'rgba(255, 255, 255, 0.03)', 
+                        border: q.id === activeQr?.id ? '1px solid rgba(124, 58, 237, 0.4)' : '1px solid rgba(255, 255, 255, 0.05)', 
+                        borderRadius: '16px', 
+                        padding: '1.25rem', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '12px',
+                        cursor: 'pointer',
+                        transform: q.id === activeQr?.id ? 'translateY(-2px)' : 'none',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                        position: 'relative',
+                        boxShadow: q.id === activeQr?.id ? '0 8px 16px rgba(124, 58, 237, 0.15)' : 'none'
+                      }}>
+                      {q.id === activeQr?.id && <div style={{ position: 'absolute', top: '-10px', right: '12px', background: '#7c3aed', color: 'white', padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800' }}>ACTIVE</div>}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <div style={{ width: '48px', height: '48px', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)' }}>

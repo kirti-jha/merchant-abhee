@@ -46,10 +46,10 @@ router.patch("/read-all", requireAuth, async (req: AuthRequest, res) => {
 
 // POST /api/notifications — create a notification (internal use)
 router.post("/", requireAuth, async (req: AuthRequest, res) => {
-  const { user_id, title, message, type } = req.body;
+  const { user_id, title, message, type, link } = req.body;
   try {
     const notif = await prisma.notification.create({
-      data: { userId: user_id || req.userId!, title, message, type: type || "info" },
+      data: { userId: user_id || req.userId!, title, message, type: type || "info", link },
     });
     res.json(notif);
   } catch (e: any) {

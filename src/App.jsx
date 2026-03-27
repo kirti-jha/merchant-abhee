@@ -11,6 +11,7 @@ import MerchantsPage from './pages/MerchantsPage';
 import './index.css';
 
 import ReconciliationPage from './pages/ReconciliationPage';
+import ReportsPage from './pages/ReportsPage';
 import QrCodesAdminPage from './pages/QrCodesAdminPage';
 import SettlementsAdminPage from './pages/SettlementsAdminPage';
 import FundRequestsAdminPage from './pages/FundRequestsAdminPage';
@@ -38,6 +39,7 @@ function App() {
           {/* Merchant Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute requiredRole="merchant"><DashboardPage /></ProtectedRoute>} />
           <Route path="/transactions" element={<ProtectedRoute requiredRole="merchant"><TransactionsPage /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute requiredRole="merchant"><ReportsPage /></ProtectedRoute>} />
           <Route path="/qr-codes" element={<ProtectedRoute requiredRole="merchant"><QrCodesPage /></ProtectedRoute>} />
           <Route path="/wallet" element={<ProtectedRoute requiredRole="merchant"><WalletPage /></ProtectedRoute>} />
           <Route path="/api-services" element={<ProtectedRoute requiredRole="merchant"><ApiServicesPage /></ProtectedRoute>} />

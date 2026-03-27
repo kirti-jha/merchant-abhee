@@ -52,6 +52,9 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Health check
 app.get("/health", (_req, res) => {
+  const msg = `[${new Date().toISOString()}] Health check hit from ${_req.ip}`;
+  console.log(msg);
+  fs.appendFileSync("server_hits.log", msg + "\n");
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 

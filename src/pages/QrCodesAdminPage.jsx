@@ -65,9 +65,26 @@ const QrCodesAdminPage = () => {
           canvas.width = img.width;
           canvas.height = img.height;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          
+          const tryScan = (filter = 'none') => {
+            ctx.filter = filter;
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            return jsQR(imageData.data, imageData.width, imageData.height);
+          };
+
+          // Pass 1: Original
+          let code = tryScan();
+          
+          // Pass 2: High Contrast
+          if (!code) code = tryScan('contrast(200%) grayscale(100%)');
+          
+          // Pass 3: Brightness boost + Contrast
+          if (!code) code = tryScan('brightness(120%) contrast(150%) grayscale(100%)');
+          
+          // Pass 4: Low Brightness (for overexposed)
+          if (!code) code = tryScan('brightness(80%) contrast(200%) grayscale(100%)');
+
           resolve(code ? code.data : null);
         };
         img.onerror = () => resolve(null);
@@ -81,34 +98,22 @@ const QrCodesAdminPage = () => {
   const processFiles = async (files) => {
     if (uploadMode === 'single') {
         const file = files[0];
-        // ... (existing single file scanning logic)
         setSelectedFile(file);
         setScanError('');
         setIsScanning(true);
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-             // ...
-             const canvas = document.createElement('canvas');
-             canvas.width = img.width;
-             canvas.height = img.height;
-             const ctx = canvas.getContext('2d');
-             ctx.drawImage(img, 0, 0);
-             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-             const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-             if (code) {
-               setFormData(prev => ({ ...prev, upiId: code.data }));
-             } else {
-               setScanError('Could not find a valid QR code in this image.');
-             }
-             setIsScanning(false);
-          };
-          img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
+        try {
+            const upiId = await scanQrCode(file);
+            if (upiId) {
+                setFormData(prev => ({ ...prev, upiId: upiId }));
+            } else {
+                setScanError('Could not find a valid QR code in this image.');
+            }
+        } catch (err) {
+            setScanError('Error scanning QR code.');
+        } finally {
+            setIsScanning(false);
+        }
     } else {
         // Bulk mode
         let allFiles = [];
