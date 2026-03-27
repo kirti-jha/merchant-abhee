@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
+import { API_BASE } from '../config/api';
 import './Header.css';
 
 const Header = ({ title }) => {
@@ -18,7 +19,7 @@ const Header = ({ title }) => {
     const fetchNotifs = async () => {
         try {
             const token = sessionStorage.getItem('authToken');
-            const res = await fetch('http://localhost:4001/api/notifications', {
+            const res = await fetch(`${API_BASE}/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -43,7 +44,7 @@ const Header = ({ title }) => {
   const markRead = async (id) => {
     try {
         const token = sessionStorage.getItem('authToken');
-        await fetch(`http://localhost:4001/api/notifications/${id}/read`, {
+        await fetch(`${API_BASE}/notifications/${id}/read`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}` }
         });

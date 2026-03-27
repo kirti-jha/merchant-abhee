@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { API_ORIGIN } from '../config/api';
 import jsQR from 'jsqr';
 import './QrCodesPage.css';
 
@@ -110,7 +111,7 @@ const QrCodesPage = () => {
                         <div style={{ position: 'relative', width: '220px', height: '220px', overflow: 'hidden', borderRadius: '12px', background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {activeQr.imagePath ? (
                                 <img 
-                                    src={`http://localhost:4001${activeQr.imagePath}`} 
+                                    src={`${API_ORIGIN}${activeQr.imagePath}`} 
                                     alt="Merchant QR" 
                                     style={{ 
                                         width: '100%', 
@@ -359,7 +360,7 @@ const QrCodesPage = () => {
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <div style={{ width: '48px', height: '48px', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)' }}>
                                 <img 
-                                    src={`http://localhost:4001${q.imagePath}`} 
+                                    src={`${API_ORIGIN}${q.imagePath}`} 
                                     alt="QR" 
                                     style={{ width: '100%', height: '100%', objectFit: 'cover', transform: q.upiId?.startsWith('MANUAL-UPI') ? 'scale(2.5)' : 'none' }} 
                                 />

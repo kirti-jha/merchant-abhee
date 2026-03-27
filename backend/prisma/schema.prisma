@@ -53,6 +53,12 @@ model Profile {
   fullName      String   @default("") @map("full_name")
   phone         String?
   businessName  String?  @map("business_name")
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  panNumber     String?  @map("pan_number")
+  aadhaarNumber String?  @map("aadhaar_number")
   parentId      String?  @map("parent_id") @db.Uuid
   kycStatus     String   @default("pending") @map("kyc_status")
   status        String   @default("active")

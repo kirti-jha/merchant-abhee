@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE } from '../config/api';
 import './CallbacksPage.css';
 
 const CallbacksPage = () => {
@@ -13,9 +14,6 @@ const CallbacksPage = () => {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
 
-    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000/api';
-
-
     useEffect(() => {
         fetchData();
     }, []);
@@ -25,7 +23,7 @@ const CallbacksPage = () => {
         try {
             const token = sessionStorage.getItem('authToken');
             const [profileRes, logsRes] = await Promise.all([
-                fetch(`${API_BASE}/auth/profile`, { 
+                fetch(`${API_BASE}/users/profile`, { 
                     headers: { 'Authorization': `Bearer ${token}` },
                     credentials: 'include' 
                 }).then(r => r.json()),

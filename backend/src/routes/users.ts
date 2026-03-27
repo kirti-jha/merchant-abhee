@@ -43,8 +43,17 @@ router.get("/", requireAuth, async (req: AuthRequest, res) => {
     const result = profiles.map(p => ({
       id: p.id,
       userId: p.userId,       // <-- actual User ID for wallet/QR operations
+      mid: `MID-${p.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
       fullName: p.fullName,
       businessName: p.businessName,
+      phone: p.phone,
+      address: p.address,
+      city: p.city,
+      state: p.state,
+      pincode: p.pincode,
+      panNumber: p.panNumber,
+      aadhaarNumber: p.aadhaarNumber,
+      callbackUrl: p.callbackUrl,
       status: p.status,
       email: p.user?.email,
       role: p.user?.roles[0]?.role,
@@ -80,11 +89,33 @@ router.get("/profile", requireAuth, async (req: AuthRequest, res) => {
 
 // PATCH /api/users/profile — update own profile
 router.patch("/profile", requireAuth, async (req: AuthRequest, res) => {
-  const { fullName, phone, businessName, callbackUrl } = req.body;
+  const {
+    fullName,
+    phone,
+    businessName,
+    address,
+    city,
+    state,
+    pincode,
+    panNumber,
+    aadhaarNumber,
+    callbackUrl,
+  } = req.body;
   try {
     const profile = await prisma.profile.update({
       where: { userId: req.userId! },
-      data: { fullName, phone, businessName, callbackUrl },
+      data: {
+        fullName,
+        phone,
+        businessName,
+        address,
+        city,
+        state,
+        pincode,
+        panNumber,
+        aadhaarNumber,
+        callbackUrl,
+      },
     });
     res.json(profile);
   } catch (e: any) {
@@ -115,6 +146,13 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
               fullName: full_name,
               phone: extra.phone,
               businessName: extra.business_name,
+              address: extra.address,
+              city: extra.city,
+              state: extra.state,
+              pincode: extra.pincode,
+              panNumber: extra.pan_number || extra.panNumber,
+              aadhaarNumber: extra.aadhaar_number || extra.aadhaarNumber,
+              callbackUrl: extra.callback_url || null,
               parentId: parent_id,
               status: "active",
               kycStatus: "pending",
@@ -139,6 +177,85 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
     });
 
     res.json({ success: true, user: { id: result.id, email: result.email }, profile: result.profile });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/users/:id — update a user/profile
+router.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const {
+    email,
+    password,
+    full_name,
+    phone,
+    business_name,
+    address,
+    city,
+    state,
+    pincode,
+    pan_number,
+    aadhaar_number,
+    callback_url,
+    status,
+  } = req.body;
+
+  try {
+    const callerId = req.userId!;
+    const myRole = await prisma.userRole.findFirst({ where: { userId: callerId } });
+    const targetProfile = await prisma.profile.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!targetProfile) return res.status(404).json({ error: "Profile not found" });
+
+    if (myRole?.role !== "admin") {
+      const myProfile = await prisma.profile.findUnique({ where: { userId: callerId } });
+      if (targetProfile.parentId !== myProfile?.id && targetProfile.userId !== callerId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+
+    if (email && email !== targetProfile.user.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) return res.status(400).json({ error: "Email already exists" });
+    }
+
+    const userData: Record<string, unknown> = {};
+    if (typeof email !== "undefined") userData.email = email;
+    if (password) userData.passwordHash = await bcrypt.hash(password, 10);
+
+    const profileData: Record<string, unknown> = {};
+    if (typeof full_name !== "undefined") profileData.fullName = full_name;
+    if (typeof phone !== "undefined") profileData.phone = phone || null;
+    if (typeof business_name !== "undefined") profileData.businessName = business_name || null;
+    if (typeof address !== "undefined") profileData.address = address || null;
+    if (typeof city !== "undefined") profileData.city = city || null;
+    if (typeof state !== "undefined") profileData.state = state || null;
+    if (typeof pincode !== "undefined") profileData.pincode = pincode || null;
+    if (typeof pan_number !== "undefined") profileData.panNumber = pan_number || null;
+    if (typeof aadhaar_number !== "undefined") profileData.aadhaarNumber = aadhaar_number || null;
+    if (typeof callback_url !== "undefined") profileData.callbackUrl = callback_url || null;
+    if (typeof status !== "undefined") profileData.status = status;
+
+    const [, updatedProfile] = await prisma.$transaction([
+      Object.keys(userData).length
+        ? prisma.user.update({
+            where: { id: targetProfile.userId },
+            data: userData,
+          })
+        : prisma.user.findUniqueOrThrow({ where: { id: targetProfile.userId } }),
+      Object.keys(profileData).length
+        ? prisma.profile.update({
+            where: { id },
+            data: profileData,
+          })
+        : prisma.profile.findUniqueOrThrow({ where: { id } }),
+    ]);
+
+    res.json({ success: true, profile: updatedProfile });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

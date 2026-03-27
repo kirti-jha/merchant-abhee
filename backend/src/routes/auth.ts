@@ -114,6 +114,42 @@ router.get("/me", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // POST /api/auth/login-as/:id — Admin login-as feature
+router.post("/change-password", requireAuth, async (req: AuthRequest, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ error: "Old password and new password are required" });
+  }
+
+  if (String(newPassword).length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters long" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const passwordMatches = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!passwordMatches) {
+      return res.status(400).json({ error: "Current password is incorrect" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: req.userId! },
+      data: { passwordHash },
+    });
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/auth/login-as/:id
 router.post("/login-as/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const callerId = req.userId!;

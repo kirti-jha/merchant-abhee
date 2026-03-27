@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { API_BASE } from '../config/api';
 
 const AppContext = createContext();
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000/api';
 
 export const AppProvider = ({ children }) => {
     const [wallet, setWallet] = useState({ balance: 0, eWalletBalance: 0 });
@@ -171,16 +171,61 @@ export const AppProvider = ({ children }) => {
                 headers: getHeaders(),
                 body: JSON.stringify({
                     email: merchant.email,
-                    password: 'Password123!', // Default password
-                    full_name: merchant.name,
+                    password: merchant.password || 'Password123!',
+                    full_name: `${merchant.firstName || ''} ${merchant.lastName || ''}`.trim() || merchant.businessName || merchant.email,
                     role: 'retailer',
-                    business_name: merchant.name,
-                    phone: '0000000000'
+                    business_name: merchant.businessName || `${merchant.firstName || ''} ${merchant.lastName || ''}`.trim(),
+                    phone: merchant.phone || '',
+                    address: merchant.address || '',
+                    city: merchant.city || '',
+                    state: merchant.state || '',
+                    pincode: merchant.pincode || '',
+                    pan_number: merchant.panNumber || '',
+                    aadhaar_number: merchant.aadhaarNumber || '',
+                    callback_url: merchant.callbackUrl || ''
                 })
             });
-            if (res.ok) await fetchData();
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            }
+            return { success: false, error: data.error || 'Failed to add merchant' };
         } catch (err) {
             console.error("Add merchant failed", err);
+            return { success: false, error: "Server error" };
+        }
+    };
+
+    const updateMerchant = async (id, merchant) => {
+        try {
+            const res = await fetch(`${API_BASE}/users/${id}`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    email: merchant.email,
+                    password: merchant.password || undefined,
+                    full_name: `${merchant.firstName || ''} ${merchant.lastName || ''}`.trim() || merchant.businessName || merchant.email,
+                    business_name: merchant.businessName || '',
+                    phone: merchant.phone || '',
+                    address: merchant.address || '',
+                    city: merchant.city || '',
+                    state: merchant.state || '',
+                    pincode: merchant.pincode || '',
+                    pan_number: merchant.panNumber || '',
+                    aadhaar_number: merchant.aadhaarNumber || '',
+                    callback_url: merchant.callbackUrl || ''
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await fetchData();
+                return { success: true, data };
+            }
+            return { success: false, error: data.error || 'Failed to update merchant' };
+        } catch (err) {
+            console.error("Update merchant failed", err);
+            return { success: false, error: "Server error" };
         }
     };
 
@@ -478,7 +523,7 @@ export const AppProvider = ({ children }) => {
             loading,
             addFunds,
             requestFunds,
-            addMerchant, updateMerchantStatus, deleteMerchant,
+            addMerchant, updateMerchant, updateMerchantStatus, deleteMerchant,
             addBankAccount, deleteBankAccount, bankAccounts,
             requestSettlement, fetchSettlements, settlements,
             approveSettlement, rejectSettlement,

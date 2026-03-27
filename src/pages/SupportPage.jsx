@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import { API_BASE } from '../config/api';
 import './SupportPage.css';
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000/api';
 
 
 

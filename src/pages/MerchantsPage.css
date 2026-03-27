@@ -163,6 +163,7 @@
 .merchant-actions {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .action-btn {
@@ -178,6 +179,7 @@
 }
 
 .action-btn:hover { color: var(--text-h); border-color: rgba(255,255,255,0.2); }
+.action-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 .action-btn.login-btn { color: var(--primary); border-color: rgba(124,108,248,0.3); }
 .action-btn.danger-btn { color: var(--danger); border-color: rgba(239,68,68,0.3); }
 /* Modal Overlay */
@@ -204,9 +206,16 @@
   border: 1px solid var(--border);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   overflow: hidden;
-  max-height: 90vh;
+  max-height: calc(100vh - 3rem);
   display: flex;
   flex-direction: column;
+}
+
+.modal-container form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .modal-header-gradient {
@@ -216,6 +225,7 @@
   justify-content: space-between;
   align-items: center;
   color: #fff;
+  flex-shrink: 0;
 }
 
 .modal-header-gradient h3 {
@@ -244,7 +254,11 @@
 
 .modal-body {
   padding: 1.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .modal-grid {
@@ -313,6 +327,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
+  flex-shrink: 0;
 }
 
 .btn-cancel {
@@ -344,6 +359,11 @@
 
 .btn-create:hover {
   opacity: 0.9;
+}
+
+.btn-create:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* Tab Filter System */
