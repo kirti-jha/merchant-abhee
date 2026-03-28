@@ -1,0 +1,4 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home2/kailasha/public_html/abheepayqr02/
+    - /bin/cp -R dist/* $DEPLOYPATH

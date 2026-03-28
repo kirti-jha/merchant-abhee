@@ -227,6 +227,21 @@ export const AppProvider = ({ children }) => {
         }
     };
 
+    const updateMerchant = async (id, merchantData) => {
+        try {
+            const res = await fetch(`${API_BASE}/users/${id}`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify(merchantData)
+            });
+            if (res.ok) await fetchData();
+            return await res.json();
+        } catch (err) {
+            console.error("Update merchant failed", err);
+            return { success: false, error: "Server error" };
+        }
+    };
+
     const updateMerchantStatus = async (id, status) => {
         try {
             const res = await fetch(`${API_BASE}/users/${id}/status`, {
